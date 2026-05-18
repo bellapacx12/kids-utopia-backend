@@ -1,0 +1,42 @@
+# Binaries
+*.exe
+*.out
+*.bin
+api
+worker
+
+# Build folders
+/dist
+/build
+
+# Go vendor
+/vendor
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Environment files (VERY IMPORTANT)
+.env
+.env.*
+!.env.example
+
+# IDE
+.vscode/
+.idea/
+
+# Temporary files
+/tmp
+*.tmp
+
+# Test cache
+*.test
+
+# Docker artifacts
+docker-compose.override.yml
+
+# AWS credentials (CRITICAL)
+.aws/

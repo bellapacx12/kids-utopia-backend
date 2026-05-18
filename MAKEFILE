@@ -1,0 +1,14 @@
+run:
+	go run cmd/api/main.go
+
+dev:
+	air
+
+up:
+	docker compose up -d
+
+down:
+	docker compose down
+
+logs:
+	docker compose logs -f
