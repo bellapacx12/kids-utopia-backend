@@ -2,8 +2,7 @@
 *.exe
 *.out
 *.bin
-api
-worker
+
 
 # Build folders
 /dist
