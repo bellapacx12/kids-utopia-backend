@@ -4,9 +4,13 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"time"
 
 	"github.com/bellapacx/kids-utopia/internal/notifications/otp"
+	"github.com/bellapacx/kids-utopia/pkg/redis"
 	"github.com/bellapacx/kids-utopia/pkg/security"
+
+	goredis "github.com/redis/go-redis/v9"
 )
 
 type Service struct {
@@ -76,10 +80,18 @@ return s.otpService.Send(key, code)
 // ========================================
 
 func (s *Service) Login(ctx context.Context, req LoginRequest, deviceID string) (*LoginResponse, error) {
-
+    
+	key := "login:attempt:" + strings.ToLower(strings.TrimSpace(req.Identifier))
+	val, err := redis.Client.Get(ctx, key).Int()
+if err != nil && err != goredis.Nil {
+	return nil, err
+}
+if val >= 5 {
+	return nil, errors.New("too many login attempts, try again later")
+}
 	identifier := strings.ToLower(strings.TrimSpace(req.Identifier))
 
-user, err := s.repo.FindByIdentifier(ctx, identifier)
+    user, err := s.repo.FindByIdentifier(ctx, identifier)
 
 	
 	if err != nil {
@@ -95,6 +107,8 @@ user, err := s.repo.FindByIdentifier(ctx, identifier)
 	if !security.CheckPassword(user.PasswordHash, req.Password) {
 		return nil, errors.New("invalid credentials")
 	}
+	redis.Client.Incr(ctx, key)
+redis.Client.Expire(ctx, key, 10*time.Minute)
 
 	// ACCESS TOKEN
 	accessToken, err := security.GenerateToken(
@@ -135,11 +149,13 @@ user, err := s.repo.FindByIdentifier(ctx, identifier)
 	// STORE SESSION (Redis) 
 	err = StoreRefreshSession(user.ID, refreshToken) 
 	if err != nil { return nil, err }
-
+    redis.Client.Del(ctx, key)
 	return &LoginResponse{
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
 	}, nil
+
+	
 }
 // ========================================
 // VERIFY OTP
@@ -161,23 +177,43 @@ ok := s.otpService.Verify(key, req.Code)
 }
 func (s *Service) RefreshToken(ctx context.Context, oldToken string) (*LoginResponse, error) {
 
+	// 1. validate old token
 	userID, err := s.repo.ValidateRefreshToken(ctx, oldToken)
+	if err != nil {
+		return nil, errors.New("invalid refresh token")
+	}
+
+	// 2. revoke old token in DB
+	err = s.repo.RevokeToken(ctx, oldToken)
 	if err != nil {
 		return nil, err
 	}
 
-	// REVOKE OLD TOKEN
-	s.repo.RevokeToken(ctx, oldToken)
+	// 3. remove old Redis session
+	_ = DeleteRefreshSession(oldToken)
 
-	// GENERATE NEW TOKENS
-	newAccessToken, _ := security.GenerateToken(userID, "parent", s.jwtSecret)
-	newRefreshToken, err := security.GenerateRandomToken()
-if err != nil {
-	return nil, err
-}
+	// 4. generate new tokens
+	newAccessToken, err := security.GenerateToken(userID, "parent", s.jwtSecret)
+	if err != nil {
+		return nil, err
+	}
 
-	// STORE NEW TOKEN
-	s.repo.StoreRefreshToken(ctx, userID, newRefreshToken, "device")
+	newRefreshToken, err := security.GenerateRefreshToken()
+	if err != nil {
+		return nil, err
+	}
+
+	// 5. store new refresh token in DB
+	err = s.repo.StoreRefreshToken(ctx, userID, newRefreshToken, "device")
+	if err != nil {
+		return nil, err
+	}
+
+	// 6. store new session in Redis
+	err = StoreRefreshSession(userID, newRefreshToken)
+	if err != nil {
+		return nil, err
+	}
 
 	return &LoginResponse{
 		AccessToken:  newAccessToken,
@@ -200,9 +236,8 @@ func normalizeIdentifier(identifier string) (email, phone string, err error) {
 	return "", phone, nil
 }
 func (s *Service) ForgotPassword(ctx context.Context, req ForgotPasswordRequest) error {
-    
-	key := strings.ToLower(strings.TrimSpace(req.Identifier))
-	user, err := s.repo.FindByIdentifier(ctx, key)
+
+	user, err := s.repo.FindByIdentifier(ctx, req.Identifier)
 	if err != nil || user == nil {
 		return errors.New("invalid request")
 	}
@@ -248,6 +283,22 @@ if err != nil || !valid {
 
 	// 🔥 invalidate session after success
 	DeleteResetSession(req.Identifier)
+
+	return nil
+}
+func (s *Service) Logout(ctx context.Context, refreshToken string) error {
+
+	// revoke token in postgres
+	err := s.repo.RevokeToken(ctx, refreshToken)
+	if err != nil {
+		return err
+	}
+
+	// remove redis session
+	err = DeleteRefreshSession(refreshToken)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }

@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/bellapacx/kids-utopia/pkg/database"
-	"github.com/bellapacx/kids-utopia/pkg/security"
 )
 
 type Repository struct{}
@@ -94,7 +93,7 @@ func (r *Repository) StoreRefreshToken(
 	deviceID string,
 ) error {
 
-	tokenHash := security.HashToken(token)
+	
 
 	_, err := database.DB.Exec(ctx, `
 		INSERT INTO refresh_tokens (
@@ -106,7 +105,7 @@ func (r *Repository) StoreRefreshToken(
 		VALUES ($1, $2, $3, NOW() + INTERVAL '7 days')
 	`,
 		userID,
-		tokenHash,
+		token,
 		deviceID,
 	)
 
@@ -117,7 +116,7 @@ func (r *Repository) ValidateRefreshToken(
 	token string,
 ) (string, error) {
 
-	tokenHash := security.HashToken(token)
+	
 
 	var userID string
 
@@ -127,7 +126,7 @@ func (r *Repository) ValidateRefreshToken(
 		WHERE token_hash = $1
 		AND revoked = false
 		AND expires_at > NOW()
-	`, tokenHash).Scan(&userID)
+	`, token).Scan(&userID)
 
 	if err != nil {
 		return "", err
@@ -140,13 +139,13 @@ func (r *Repository) RevokeToken(
 	token string,
 ) error {
 
-	tokenHash := security.HashToken(token)
+	
 
 	_, err := database.DB.Exec(ctx, `
 		UPDATE refresh_tokens
 		SET revoked = true
 		WHERE token_hash = $1
-	`, tokenHash)
+	`, token)
 
 	return err
 }

@@ -2,6 +2,8 @@ package otp
 
 import (
 	"context"
+	"errors"
+	"strings"
 	"time"
 
 	redis "github.com/bellapacx/kids-utopia/pkg/redis"
@@ -40,7 +42,23 @@ func (s *Service) Verify(to string, code string) bool {
 }
 func (s *Service) Send(to string, code string) error {
 
-	err := redis.Client.Set(
+	key := "otp:rate:" + strings.ToLower(strings.TrimSpace(to))
+
+	exists, err := redis.Client.Exists(context.Background(), key).Result()
+if err != nil {
+	return err
+}
+
+if exists == 1 {
+	return errors.New("too many OTP requests, try again later")
+}
+redis.Client.Set(
+	context.Background(),
+	key,
+	"1",
+	60*time.Second,
+)
+	err = redis.Client.Set(
 		context.Background(),
 		"otp:"+to,
 		code,

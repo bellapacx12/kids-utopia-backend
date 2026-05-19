@@ -162,3 +162,22 @@ func (h *Handler) ResetPassword(c *gin.Context) {
 
 	c.JSON(200, gin.H{"message": "password updated"})
 }
+func (h *Handler) Logout(c *gin.Context) {
+
+	var req LogoutRequest
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"error": "invalid request"})
+		return
+	}
+
+	err := h.service.Logout(c.Request.Context(), req.RefreshToken)
+	if err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(200, gin.H{
+		"message": "logged out successfully",
+	})
+}
