@@ -27,7 +27,7 @@ func (h *Handler) Register(c *gin.Context) {
 		return
 	}
 
-	err := h.service.Register(req)
+	err := h.service.Register(c.Request.Context(),req)
 	if err != nil {
 		response.Error(c, 500, err.Error())
 		return
@@ -64,7 +64,7 @@ func (h *Handler) Login(c *gin.Context) {
 	// LOGIN SERVICE CALL
 	// ====================================
 
-	res, err := h.service.Login(req, deviceID)
+	res, err := h.service.Login(c.Request.Context(),req, deviceID)
 	if err != nil {
 		response.Error(c, 401, err.Error())
 		return
@@ -81,7 +81,7 @@ func (h *Handler) VerifyOTP(c *gin.Context) {
 		return
 	}
 
-	err := h.service.VerifyOTP(req)
+	err := h.service.VerifyOTP(c.Request.Context(),req)
 	if err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
 		return
@@ -105,7 +105,7 @@ func (h *Handler) RefreshToken(c *gin.Context) {
 		return
 	}
 
-	res, err := h.service.RefreshToken(req.RefreshToken)
+	res, err := h.service.RefreshToken(c.Request.Context(),req.RefreshToken)
 	if err != nil {
 		response.Error(c, 401, err.Error())
 		return
@@ -122,7 +122,7 @@ func (h *Handler) ForgotPassword(c *gin.Context) {
 		return
 	}
 
-	err := h.service.ForgotPassword(req)
+	err := h.service.ForgotPassword(c.Request.Context(),req)
 	if err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
 		return
@@ -138,7 +138,7 @@ func (h *Handler) VerifyResetOTP(c *gin.Context) {
 		return
 	}
 
-	err := h.service.VerifyResetOTP(req)
+	err := h.service.VerifyResetOTP(c.Request.Context(),req)
 	if err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
 		return
@@ -154,7 +154,7 @@ func (h *Handler) ResetPassword(c *gin.Context) {
 		return
 	}
 
-	err := h.service.ResetPassword(req)
+	err := h.service.ResetPassword(c.Request.Context(),req)
 	if err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
 		return

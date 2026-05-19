@@ -3,7 +3,6 @@ package auth
 import (
 	"context"
 	"errors"
-	"fmt"
 	"strings"
 
 	"github.com/bellapacx/kids-utopia/internal/notifications/otp"
@@ -28,7 +27,7 @@ func NewService(repo *Repository, otpService *otp.Service,secret string,) *Servi
 // REGISTER
 // ========================================
 
-func (s *Service) Register(req RegisterRequest) error {
+func (s *Service) Register(ctx context.Context, req RegisterRequest) error {
 
 	if req.Name == "" {
 		return errors.New("name is required")
@@ -40,7 +39,7 @@ func (s *Service) Register(req RegisterRequest) error {
 	}
 
 	// 🔥 CHECK IF USER EXISTS FIRST
-	exists, err := s.repo.ExistsByIdentifier(context.Background(), email, phone)
+	exists, err := s.repo.ExistsByIdentifier(ctx, email, phone)
 	if err != nil {
 		return err
 	}
@@ -54,7 +53,7 @@ func (s *Service) Register(req RegisterRequest) error {
 	}
 
 	err = s.repo.CreateUser(
-		context.Background(),
+		ctx,
 		req.Name,
 		email,
 		phone,
@@ -66,24 +65,23 @@ func (s *Service) Register(req RegisterRequest) error {
 
 	code := generateOTP()
 
-	StoreOTP(req.Identifier, code)
+	key := strings.ToLower(strings.TrimSpace(req.Identifier))
 
-	fmt.Println("OTP:", code)
+StoreOTP(key, code)
 
-	return s.otpService.Send(req.Identifier, code)
+return s.otpService.Send(key, code)
 }
 // ========================================
 // LOGIN
 // ========================================
 
-func (s *Service) Login(req LoginRequest, deviceID string) (*LoginResponse, error) {
+func (s *Service) Login(ctx context.Context, req LoginRequest, deviceID string) (*LoginResponse, error) {
 
-	identifier := strings.TrimSpace(req.Identifier)
+	identifier := strings.ToLower(strings.TrimSpace(req.Identifier))
 
-	user, err := s.repo.FindByIdentifier(
-		context.Background(),
-		identifier,
-	)
+user, err := s.repo.FindByIdentifier(ctx, identifier)
+
+	
 	if err != nil {
 		return nil, errors.New("invalid credentials")
 	}
@@ -124,7 +122,7 @@ func (s *Service) Login(req LoginRequest, deviceID string) (*LoginResponse, erro
 
 	// STORE REFRESH TOKEN IN DB
 	err = s.repo.StoreRefreshToken(
-		context.Background(),
+		ctx,
 		user.ID,
 		tokenHash,
 		deviceID,
@@ -147,28 +145,29 @@ func (s *Service) Login(req LoginRequest, deviceID string) (*LoginResponse, erro
 // VERIFY OTP
 // ========================================
 
-func (s *Service) VerifyOTP(req VerifyOTPRequest) error {
+func (s *Service) VerifyOTP(ctx context.Context, req VerifyOTPRequest) error {
 
-	ok := s.otpService.Verify(req.Identifier, req.Code)
+key := strings.ToLower(strings.TrimSpace(req.Identifier))
 
+ok := s.otpService.Verify(key, req.Code)
 	if !ok {
 		return errors.New("invalid otp")
 	}
 
 	return s.repo.VerifyUser(
-		context.Background(),
+		ctx,
 		req.Identifier,
 	)
 }
-func (s *Service) RefreshToken(oldToken string) (*LoginResponse, error) {
+func (s *Service) RefreshToken(ctx context.Context, oldToken string) (*LoginResponse, error) {
 
-	userID, err := s.repo.ValidateRefreshToken(context.Background(), oldToken)
+	userID, err := s.repo.ValidateRefreshToken(ctx, oldToken)
 	if err != nil {
 		return nil, err
 	}
 
 	// REVOKE OLD TOKEN
-	s.repo.RevokeToken(context.Background(), oldToken)
+	s.repo.RevokeToken(ctx, oldToken)
 
 	// GENERATE NEW TOKENS
 	newAccessToken, _ := security.GenerateToken(userID, "parent", s.jwtSecret)
@@ -178,7 +177,7 @@ if err != nil {
 }
 
 	// STORE NEW TOKEN
-	s.repo.StoreRefreshToken(context.Background(), userID, newRefreshToken, "device")
+	s.repo.StoreRefreshToken(ctx, userID, newRefreshToken, "device")
 
 	return &LoginResponse{
 		AccessToken:  newAccessToken,
@@ -200,9 +199,10 @@ func normalizeIdentifier(identifier string) (email, phone string, err error) {
 	phone = identifier
 	return "", phone, nil
 }
-func (s *Service) ForgotPassword(req ForgotPasswordRequest) error {
-
-	user, err := s.repo.FindByIdentifier(context.Background(), req.Identifier)
+func (s *Service) ForgotPassword(ctx context.Context, req ForgotPasswordRequest) error {
+    
+	key := strings.ToLower(strings.TrimSpace(req.Identifier))
+	user, err := s.repo.FindByIdentifier(ctx, key)
 	if err != nil || user == nil {
 		return errors.New("invalid request")
 	}
@@ -215,7 +215,7 @@ func (s *Service) ForgotPassword(req ForgotPasswordRequest) error {
 
 	return s.otpService.Send(req.Identifier, code)
 }
-func (s *Service) VerifyResetOTP(req VerifyResetOTPRequest) error {
+func (s *Service) VerifyResetOTP(ctx context.Context,req VerifyResetOTPRequest) error {
 
 	ok := s.otpService.Verify(req.Identifier, req.Code)
 	if !ok {
@@ -224,7 +224,7 @@ func (s *Service) VerifyResetOTP(req VerifyResetOTPRequest) error {
 
 	return nil
 }
-func (s *Service) ResetPassword(req ResetPasswordRequest) error {
+func (s *Service) ResetPassword(ctx context.Context,req ResetPasswordRequest) error {
 
 	valid, err := ValidateResetSession(req.Identifier)
 if err != nil || !valid {
@@ -241,7 +241,7 @@ if err != nil || !valid {
 		return err
 	}
 
-	err = s.repo.UpdatePassword(context.Background(), req.Identifier, hash)
+	err = s.repo.UpdatePassword(ctx, req.Identifier, hash)
 	if err != nil {
 		return err
 	}
