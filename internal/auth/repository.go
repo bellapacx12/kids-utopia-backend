@@ -24,19 +24,19 @@ func (r *Repository) CreateUser(
 	name,email, phone, passwordHash string,
 ) error {
 
-	var emailPtr any
-	var phonePtr any
+	var emailPtr *string
+	var phonePtr *string
 
 	if email == "" {
 		emailPtr = nil
 	} else {
-		emailPtr = email
+		emailPtr = &email
 	}
 
 	if phone == "" {
 		phonePtr = nil
 	} else {
-		phonePtr = phone
+		phonePtr = &phone
 	}
 
 	_, err := database.DB.Exec(ctx,
@@ -147,6 +147,43 @@ func (r *Repository) RevokeToken(
 		SET revoked = true
 		WHERE token_hash = $1
 	`, tokenHash)
+
+	return err
+}
+func (r *Repository) ExistsByIdentifier(
+	ctx context.Context,
+	email string,
+	phone string,
+) (bool, error) {
+
+	var exists bool
+
+	err := database.DB.QueryRow(ctx, `
+		SELECT EXISTS(
+			SELECT 1 FROM users
+			WHERE (email = $1 AND $1 IS NOT NULL)
+			   OR (phone = $2 AND $2 IS NOT NULL)
+		)
+	`, email, phone).Scan(&exists)
+
+	if err != nil {
+		return false, err
+	}
+
+	return exists, nil
+}
+
+func (r *Repository) UpdatePassword(
+	ctx context.Context,
+	identifier string,
+	passwordHash string,
+) error {
+
+	_, err := database.DB.Exec(ctx, `
+		UPDATE users
+		SET password_hash = $1
+		WHERE email = $2 OR phone = $2
+	`, passwordHash, identifier)
 
 	return err
 }

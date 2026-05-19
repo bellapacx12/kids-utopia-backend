@@ -140,16 +140,21 @@ r.Use(cors.New(cors.Config{
 			"status": "ok",
 		})
 	})
- sesSender, err := email.NewSESSender(
-	cfg.AWSRegion,
-	cfg.SESFromEmail,
-)
-if err != nil {
-	log.Fatal(err)
-}
+ //sesSender, err := email.NewSESSender(
+//	cfg.AWSRegion,
+//	cfg.SESFromEmail,
+//)
+//if err != nil {
+//	log.Fatal(err)
+//}
+// 4. Init SendGrid
+	emailSender := email.NewSendGrid(
+		cfg.SendGridAPIKey,
+		cfg.FromEmail,
+	)
 	
 smsSender := sms.NewSender()
-otpRouter := otp.NewRouter(sesSender, smsSender)
+otpRouter := otp.NewRouter(emailSender, smsSender)
 otpService := otp.NewService(otpRouter)
 	// ================================
 	// AUTH MODULE

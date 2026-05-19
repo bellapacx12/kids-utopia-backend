@@ -29,10 +29,23 @@ func NewService(repo *Repository, otpService *otp.Service,secret string,) *Servi
 // ========================================
 
 func (s *Service) Register(req RegisterRequest) error {
-    
 
 	if req.Name == "" {
 		return errors.New("name is required")
+	}
+
+	email, phone, err := normalizeIdentifier(req.Identifier)
+	if err != nil {
+		return err
+	}
+
+	// 🔥 CHECK IF USER EXISTS FIRST
+	exists, err := s.repo.ExistsByIdentifier(context.Background(), email, phone)
+	if err != nil {
+		return err
+	}
+	if exists {
+		return errors.New("user already exists")
 	}
 
 	hash, err := security.HashPassword(req.Password)
@@ -40,18 +53,6 @@ func (s *Service) Register(req RegisterRequest) error {
 		return err
 	}
 
-	var email string
-	var phone string
-
-	identifier := strings.TrimSpace(req.Identifier)
-
-	// Detect email vs phone
-	if strings.Contains(identifier, "@") {
-		email = strings.ToLower(identifier)
-	} else {
-		phone = identifier
-	}
-   
 	err = s.repo.CreateUser(
 		context.Background(),
 		req.Name,
@@ -59,26 +60,17 @@ func (s *Service) Register(req RegisterRequest) error {
 		phone,
 		hash,
 	)
-
 	if err != nil {
 		return err
 	}
 
-	// Generate OTP
 	code := generateOTP()
 
-	// Store OTP in Redis
-	StoreOTP(identifier, code)
+	StoreOTP(req.Identifier, code)
 
-	// TEMP ONLY
 	fmt.Println("OTP:", code)
-	// REAL EMAIL SEND (SES)
-	err = s.otpService.Send(identifier, code)
-if err != nil {
-	return err
-}
 
-	return nil
+	return s.otpService.Send(req.Identifier, code)
 }
 // ========================================
 // LOGIN
@@ -192,4 +184,70 @@ if err != nil {
 		AccessToken:  newAccessToken,
 		RefreshToken: newRefreshToken,
 	}, nil
+}
+func normalizeIdentifier(identifier string) (email, phone string, err error) {
+	identifier = strings.TrimSpace(identifier)
+
+	if identifier == "" {
+		return "", "", errors.New("identifier required")
+	}
+
+	if strings.Contains(identifier, "@") {
+		email = strings.ToLower(identifier)
+		return email, "", nil
+	}
+
+	phone = identifier
+	return "", phone, nil
+}
+func (s *Service) ForgotPassword(req ForgotPasswordRequest) error {
+
+	user, err := s.repo.FindByIdentifier(context.Background(), req.Identifier)
+	if err != nil || user == nil {
+		return errors.New("invalid request")
+	}
+
+	code := generateOTP()
+
+	StoreOTP(req.Identifier, code)
+
+	StoreResetSession(req.Identifier)
+
+	return s.otpService.Send(req.Identifier, code)
+}
+func (s *Service) VerifyResetOTP(req VerifyResetOTPRequest) error {
+
+	ok := s.otpService.Verify(req.Identifier, req.Code)
+	if !ok {
+		return errors.New("invalid otp")
+	}
+
+	return nil
+}
+func (s *Service) ResetPassword(req ResetPasswordRequest) error {
+
+	valid, err := ValidateResetSession(req.Identifier)
+if err != nil || !valid {
+	return errors.New("reset session expired")
+}
+
+	ok := s.otpService.Verify(req.Identifier, req.Code)
+	if !ok {
+		return errors.New("invalid otp")
+	}
+
+	hash, err := security.HashPassword(req.NewPassword)
+	if err != nil {
+		return err
+	}
+
+	err = s.repo.UpdatePassword(context.Background(), req.Identifier, hash)
+	if err != nil {
+		return err
+	}
+
+	// 🔥 invalidate session after success
+	DeleteResetSession(req.Identifier)
+
+	return nil
 }

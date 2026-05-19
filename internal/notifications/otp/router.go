@@ -16,11 +16,11 @@ func NewRouter(email Sender, sms Sender) *Router {
 	}
 }
 
-func (r *Router) Send(to string, code string) error {
+func (r *Router) Send(to string, subject string, content string) error {
 
 	if strings.Contains(to, "@") {
-		return r.email.Send(to, code)
+		return r.email.Send(to, subject, content)
 	}
 
-	return r.sms.Send(to, code)
+	return r.sms.Send(to, subject, content)
 }

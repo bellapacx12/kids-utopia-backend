@@ -113,3 +113,52 @@ func (h *Handler) RefreshToken(c *gin.Context) {
 
 	response.Success(c, res)
 }
+
+func (h *Handler) ForgotPassword(c *gin.Context) {
+
+	var req ForgotPasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"error": "invalid request"})
+		return
+	}
+
+	err := h.service.ForgotPassword(req)
+	if err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(200, gin.H{"message": "otp sent"})
+}
+func (h *Handler) VerifyResetOTP(c *gin.Context) {
+
+	var req VerifyResetOTPRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"error": "invalid request"})
+		return
+	}
+
+	err := h.service.VerifyResetOTP(req)
+	if err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(200, gin.H{"message": "otp verified"})
+}
+func (h *Handler) ResetPassword(c *gin.Context) {
+
+	var req ResetPasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"error": "invalid request"})
+		return
+	}
+
+	err := h.service.ResetPassword(req)
+	if err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(200, gin.H{"message": "password updated"})
+}

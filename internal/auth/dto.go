@@ -20,3 +20,17 @@ type LoginResponse struct {
 	AccessToken  string `json:"access_token"`
 	RefreshToken string `json:"refresh_token"`
 }
+type ForgotPasswordRequest struct {
+	Identifier string `json:"identifier"`
+}
+
+type VerifyResetOTPRequest struct {
+	Identifier string `json:"identifier"`
+	Code       string `json:"code"`
+}
+
+type ResetPasswordRequest struct {
+	Identifier string `json:"identifier"`
+	NewPassword string `json:"new_password"`
+	Code        string `json:"code"`
+}

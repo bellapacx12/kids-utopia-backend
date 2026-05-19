@@ -33,6 +33,8 @@ type Config struct {
 	SESFromEmail       string
 
 	SQSQueueURL string
+	SendGridAPIKey string
+	FromEmail string
 }
 
 func Load() *Config {
@@ -64,5 +66,8 @@ func Load() *Config {
 
 		SESFromEmail: os.Getenv("SES_FROM_EMAIL"),
 		SQSQueueURL:  os.Getenv("SQS_QUEUE_URL"),
+		SendGridAPIKey : os.Getenv("SendGridAPIKey"),
+		FromEmail : os.Getenv("FROM_EMAIL"),
+
 	}
 }
