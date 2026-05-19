@@ -21,10 +21,13 @@ import (
 	"github.com/bellapacx/kids-utopia/pkg/sqs"
 	"github.com/bellapacx/kids-utopia/pkg/storage"
 )
-func main() {
 
+func main() {
 	cfg := config.Load()
 
+	// =========================
+	// DATABASE
+	// =========================
 	dbURL := fmt.Sprintf(
 		"postgres://%s:%s@%s:%s/%s?sslmode=%s",
 		cfg.DBUser,
@@ -36,10 +39,16 @@ func main() {
 	)
 
 	database.Connect(dbURL)
-	log.Println("✅ Worker PostgreSQL connected")
+	log.Println("✅ PostgreSQL connected")
 
+	// =========================
+	// REPOSITORY
+	// =========================
 	bookPagesRepo := repository.NewBookPagesRepository(database.DB)
 
+	// =========================
+	// STORAGE
+	// =========================
 	st, err := storage.NewS3Storage(
 		cfg.S3Endpoint,
 		cfg.S3AccessKey,
@@ -48,19 +57,22 @@ func main() {
 		cfg.S3PublicURL,
 	)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("storage init error:", err)
 	}
 
+	// =========================
+	// SQS
+	// =========================
 	queue, err := sqs.New(cfg.SQSQueueURL, cfg.AWSRegion)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("sqs init error:", err)
 	}
 
-	log.Println("🚀 Worker started... listening to SQS")
+	log.Println("🚀 Worker running (SQS consumer)")
 
-	// ================================
-	// CONTEXT (FIXED)
-	// ================================
+	// =========================
+	// CONTEXT / SHUTDOWN
+	// =========================
 	ctx, cancel := context.WithCancel(context.Background())
 
 	sig := make(chan os.Signal, 1)
@@ -71,17 +83,24 @@ func main() {
 		log.Println("🛑 shutdown signal received")
 		cancel()
 	}()
-		const workerCount = 3
+
+	// =========================
+	// WORKER POOL
+	// =========================
+	const workerCount = 3
 	jobs := make(chan types.Message, 20)
 
 	for i := 0; i < workerCount; i++ {
-		go startWorker(i, jobs, queue, st, bookPagesRepo)
+		go workerLoop(i, jobs, queue, st, bookPagesRepo)
 	}
-		for {
-		select {
 
+	// =========================
+	// POLLER LOOP
+	// =========================
+	for {
+		select {
 		case <-ctx.Done():
-			log.Println("🛑 worker shutting down...")
+			log.Println("🛑 worker shutting down")
 			close(jobs)
 			return
 
@@ -99,7 +118,8 @@ func main() {
 		}
 	}
 }
-func startWorker(
+
+func workerLoop(
 	id int,
 	jobs <-chan types.Message,
 	queue *sqs.Client,
@@ -111,7 +131,7 @@ func startWorker(
 		func() {
 			defer func() {
 				if r := recover(); r != nil {
-					log.Println("🔥 worker panic recovered:", r)
+					log.Println("🔥 panic recovered:", r)
 				}
 			}()
 
@@ -124,14 +144,12 @@ func startWorker(
 
 			log.Printf("📘 worker %d processing book: %s", id, event.BookID)
 
-			err := worker.ProcessBook(event, st, repo)
-			if err != nil {
+			if err := worker.ProcessBook(event, st, repo); err != nil {
 				log.Printf("❌ worker %d failed book %s: %v", id, event.BookID, err)
 				return
 			}
 
-			err = queue.Delete(*msg.ReceiptHandle)
-			if err != nil {
+			if err := queue.Delete(*msg.ReceiptHandle); err != nil {
 				log.Println("delete error:", err)
 				return
 			}

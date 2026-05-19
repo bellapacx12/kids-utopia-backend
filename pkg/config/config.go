@@ -2,8 +2,6 @@ package config
 
 import (
 	"os"
-
-	"github.com/joho/godotenv"
 )
 
 type Config struct {
@@ -38,9 +36,6 @@ type Config struct {
 }
 
 func Load() *Config {
-
-	_ = godotenv.Load()
-
 	return &Config{
 		AppPort: os.Getenv("APP_PORT"),
 
@@ -56,15 +51,18 @@ func Load() *Config {
 		JWTSecret: os.Getenv("JWT_SECRET"),
 
 		KafkaBroker: os.Getenv("KAFKA_BROKER"),
-		S3Endpoint : os.Getenv("S3_ENDPOINT"),
-       S3AccessKey : os.Getenv("S3_ACCESS_KEY"),
-       S3SecretKey : os.Getenv("S3_SECRET_KEY"),
-       S3Bucket : os.Getenv("S3_BUCKET"),
-	   S3PublicURL : os.Getenv("S3_PUBLIC_URL"),
-	   AWSAccessKeyID:     os.Getenv("AWS_ACCESS_KEY_ID"),
-AWSSecretAccessKey: os.Getenv("AWS_SECRET_ACCESS_KEY"),
-AWSRegion:          os.Getenv("AWS_REGION"),
-SESFromEmail:       os.Getenv("SES_FROM_EMAIL"),
-SQSQueueURL: os.Getenv("SQS_QUEUE_URL"),
+
+		S3Endpoint:  os.Getenv("S3_ENDPOINT"),
+		S3AccessKey: os.Getenv("S3_ACCESS_KEY"),
+		S3SecretKey: os.Getenv("S3_SECRET_KEY"),
+		S3Bucket:    os.Getenv("S3_BUCKET"),
+		S3PublicURL: os.Getenv("S3_PUBLIC_URL"),
+
+		AWSAccessKeyID:     os.Getenv("AWS_ACCESS_KEY_ID"),
+		AWSSecretAccessKey: os.Getenv("AWS_SECRET_ACCESS_KEY"),
+		AWSRegion:          os.Getenv("AWS_REGION"),
+
+		SESFromEmail: os.Getenv("SES_FROM_EMAIL"),
+		SQSQueueURL:  os.Getenv("SQS_QUEUE_URL"),
 	}
 }

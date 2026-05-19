@@ -26,7 +26,7 @@ services:
   api:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.api
     container_name: kids_api
     restart: always
     ports:
