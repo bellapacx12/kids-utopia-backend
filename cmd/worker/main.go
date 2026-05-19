@@ -57,7 +57,7 @@ func main() {
 		cfg.S3PublicURL,
 	)
 	if err != nil {
-		log.Fatal("storage init error:", err)
+		log.Fatal("storage init errorrrr:", err)
 	}
 
 	// =========================
