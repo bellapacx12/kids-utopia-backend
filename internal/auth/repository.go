@@ -161,8 +161,10 @@ func (r *Repository) ExistsByIdentifier(
 	err := database.DB.QueryRow(ctx, `
 		SELECT EXISTS(
 			SELECT 1 FROM users
-			WHERE (email = $1 AND $1 IS NOT NULL)
-			   OR (phone = $2 AND $2 IS NOT NULL)
+			WHERE
+				($1 <> '' AND email = $1)
+				OR
+				($2 <> '' AND phone = $2)
 		)
 	`, email, phone).Scan(&exists)
 
