@@ -126,8 +126,6 @@ redis.Client.Expire(ctx, key, 10*time.Minute)
 		return nil, err
 	}
 
-	// HASH BEFORE DB STORAGE (IMPORTANT FIX)
-	tokenHash := security.HashToken(refreshToken)
 
 	// DEFAULT DEVICE
 	if deviceID == "" {
@@ -138,7 +136,7 @@ redis.Client.Expire(ctx, key, 10*time.Minute)
 	err = s.repo.StoreRefreshToken(
 		ctx,
 		user.ID,
-		tokenHash,
+		refreshToken,
 		deviceID,
 	)
 	if err != nil {
