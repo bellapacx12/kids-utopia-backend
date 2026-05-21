@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/bellapacx/kids-utopia/internal/notifications/otp"
-	"github.com/bellapacx/kids-utopia/pkg/database"
 	"github.com/bellapacx/kids-utopia/pkg/redis"
 	"github.com/bellapacx/kids-utopia/pkg/security"
 
@@ -372,42 +371,4 @@ func (s *Service) VerificationSession(
 		EmailVerified: user.EmailVerified,
 		PhoneVerified: user.PhoneVerified,
 	}, nil
-}
-func (r *Repository) FindByID(
-	ctx context.Context,
-	userID string,
-) (*User, error) {
-
-	var user User
-
-	err := database.DB.QueryRow(ctx, `
-		SELECT
-			id,
-			name,
-			email,
-			phone,
-			password_hash,
-			role,
-			is_verified,
-			email_verified,
-			phone_verified,
-		FROM users
-		WHERE id = $1
-	`, userID).Scan(
-		&user.ID,
-		&user.Name,
-		&user.Email,
-		&user.Phone,
-		&user.PasswordHash,
-		&user.Role,
-		&user.IsVerified,
-		&user.EmailVerified,
-		&user.PhoneVerified,
-	)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return &user, nil
 }
