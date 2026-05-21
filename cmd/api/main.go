@@ -15,6 +15,8 @@ import (
 
 	"github.com/bellapacx/kids-utopia/internal/books/routes"
 
+	accessmiddleware "github.com/bellapacx/kids-utopia/internal/access/middleware"
+	accessservice "github.com/bellapacx/kids-utopia/internal/access/service"
 	childrenRoutes "github.com/bellapacx/kids-utopia/internal/children"
 	childrenHandler "github.com/bellapacx/kids-utopia/internal/children/handler"
 	childrenRepo "github.com/bellapacx/kids-utopia/internal/children/repository"
@@ -30,6 +32,12 @@ import (
 	usersHandler "github.com/bellapacx/kids-utopia/internal/users/handler"
 	usersRepo "github.com/bellapacx/kids-utopia/internal/users/repository"
 	usersService "github.com/bellapacx/kids-utopia/internal/users/service"
+
+	editorroutes "github.com/bellapacx/kids-utopia/internal/books/routes"
+	subscriptionhandler "github.com/bellapacx/kids-utopia/internal/subscriptions/handler"
+	subscriptionrepository "github.com/bellapacx/kids-utopia/internal/subscriptions/repository"
+	subscriptionroutes "github.com/bellapacx/kids-utopia/internal/subscriptions/routes"
+	subscriptionservice "github.com/bellapacx/kids-utopia/internal/subscriptions/service"
 	"github.com/bellapacx/kids-utopia/pkg/config"
 	"github.com/bellapacx/kids-utopia/pkg/contextkeys"
 	"github.com/bellapacx/kids-utopia/pkg/database"
@@ -183,12 +191,57 @@ authRoutes.Register(r.Group("/api/v1"))
 	// ================================
 
 
-      bookRepo := repository.NewBookRepository()
-bookService := service.NewBookService(bookRepo, storageClient, queue)
+    
+
+bookRepo := repository.NewBookRepository()
+
+bookService := service.NewBookService(
+	bookRepo,
+	storageClient,
+	queue,
+)
+
 bookHandler := handler.NewBookHandler(bookService)
 
-routes.RegisterBookRoutes(r, bookHandler)
+// =========================
+// SUBSCRIPTIONS
+// =========================
 
+subRepo := subscriptionrepository.New(database.DB)
+
+subService := subscriptionservice.New(subRepo)
+
+subHandler := subscriptionhandler.New(subService)
+subscriptionroutes.RegisterSubscriptionRoutes(api, subHandler)
+// =========================
+// ACCESS CONTROL
+// =========================
+
+accessSvc := accessservice.New(subService)
+
+accessMw := accessmiddleware.New(
+	accessSvc,
+	bookRepo,
+)
+
+// =========================
+// BOOK ROUTES
+// =========================
+
+readerGroup := r.Group("/api/v1/books")
+
+readerGroup.Use(
+	middleware.AuthMiddleware(cfg.JWTSecret),
+)
+
+readerGroup.Use(
+	accessMw.CheckBookAccess(),
+)
+
+routes.RegisterBookRoutes(
+	readerGroup,
+	bookHandler,
+)
 bookPagesRepo := repository.NewBookPagesRepository(database.DB)
 
 editorService := service.NewEditorService(
@@ -199,7 +252,21 @@ editorService := service.NewEditorService(
 
 editorHandler := handler.NewEditorHandler(editorService)
 
-routes.RegisterEditorRoutes(api, editorHandler)
+editorGroup := r.Group("/api/v1/editor")
+
+editorGroup.Use(
+	middleware.AuthMiddleware(cfg.JWTSecret),
+)
+
+editorGroup.Use(
+	middleware.RequireRoles("editor", "admin"),
+)
+
+editorroutes.RegisterEditorRoutes(
+	editorGroup,
+	editorHandler,
+)
+editorroutes.RegisterEditorRoutes(api, editorHandler)
 // ================================
 // USERS MODULE
 // ================================

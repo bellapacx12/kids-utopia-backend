@@ -6,13 +6,14 @@ import (
 	"github.com/bellapacx/kids-utopia/internal/books/handler"
 )
 
-func RegisterBookRoutes(r *gin.Engine, h *handler.BookHandler) {
-	api := r.Group("/api/v1")
-	books := api.Group("/books")
+func RegisterBookRoutes(
+	books *gin.RouterGroup,
+	h *handler.BookHandler,
+) {
 
-	{
-		books.POST("/", h.CreateBook)
-		books.GET("/:id", h.GetBook)
-		books.POST("/upload", h.UploadBook)
-	}
+	books.POST("/", h.CreateBook)
+
+	books.GET("/:id", h.GetBook)
+
+	books.POST("/upload", h.UploadBook)
 }
