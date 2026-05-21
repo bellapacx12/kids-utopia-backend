@@ -60,7 +60,13 @@ func (h *BookHandler) GetBook(c *gin.Context) {
 func (h *BookHandler) UploadBook(c *gin.Context) {
 
 	log.Println("📥 [UploadBook] endpoint hit")
+	title := c.PostForm("title")
+author := c.PostForm("author")
 
+if title == "" || author == "" {
+	c.JSON(400, gin.H{"error": "title and author required"})
+	return
+}
 	file, err := c.FormFile("file")
 	if err != nil {
 		log.Println("❌ [UploadBook] file missing:", err)
@@ -92,7 +98,7 @@ func (h *BookHandler) UploadBook(c *gin.Context) {
 
 	log.Println("📘 [UploadBook] creating uploaded book...")
 
-	book, err := h.service.CreateUploadedBook(c.Request.Context(), file.Filename, fileURL)
+	book, err := h.service.CreateUploadedBook(c.Request.Context(), title, author, fileURL)
 	if err != nil {
 		log.Println("❌ [UploadBook] db error:", err)
 		c.JSON(500, gin.H{"error": "db errorrrr"})

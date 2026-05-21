@@ -17,6 +17,9 @@ type User struct {
 	PasswordHash string
 	Role         string
 	IsVerified   bool
+	
+	EmailVerified   bool
+	PhoneVerified   bool
 }
 
 func (r *Repository) CreateUser(
@@ -55,7 +58,8 @@ func (r *Repository) FindByIdentifier(ctx context.Context, identifier string) (*
 	var user User
 
 	err := database.DB.QueryRow(ctx, `
-		SELECT id, email, phone, password_hash, role, is_verified
+		SELECT id, email, phone, password_hash, role, is_verified, email_verified,
+		phone_verified
 		FROM users
 		WHERE email = $1 OR phone = $1
 		LIMIT 1
@@ -66,6 +70,8 @@ func (r *Repository) FindByIdentifier(ctx context.Context, identifier string) (*
 		&user.PasswordHash,
 		&user.Role,
 		&user.IsVerified,
+		&user.EmailVerified,
+	&user.PhoneVerified,
 	)
 
 	if err != nil {
@@ -188,4 +194,80 @@ func (r *Repository) UpdatePassword(
 	`, passwordHash, identifier)
 
 	return err
+}
+func (r *Repository) VerifyEmail(
+	ctx context.Context,
+	email string,
+) error {
+
+	var id string
+
+	err := database.DB.QueryRow(ctx, `
+		UPDATE users
+		SET
+			email_verified = TRUE,
+			is_verified = TRUE,
+			updated_at = NOW()
+		WHERE email = $1
+		RETURNING id
+	`, email).Scan(&id)
+
+	return err
+}
+func (r *Repository) VerifyPhone(
+	ctx context.Context,
+	phone string,
+) error {
+
+	var id string
+
+	err := database.DB.QueryRow(ctx, `
+		UPDATE users
+		SET
+			phone_verified = TRUE,
+			is_verified = TRUE,
+			updated_at = NOW()
+		WHERE phone = $1
+		RETURNING id
+	`, phone).Scan(&id)
+
+	return err
+}
+func (r *Repository) FindByID(
+	ctx context.Context,
+	userID string,
+) (*User, error) {
+
+	var user User
+
+	err := database.DB.QueryRow(ctx, `
+		SELECT
+			id,
+			name,
+			email,
+			phone,
+			password_hash,
+			role,
+			is_verified,
+			email_verified,
+			phone_verified
+		FROM users
+		WHERE id = $1
+	`, userID).Scan(
+		&user.ID,
+		&user.Name,
+		&user.Email,
+		&user.Phone,
+		&user.PasswordHash,
+		&user.Role,
+		&user.IsVerified,
+		&user.EmailVerified,
+		&user.PhoneVerified,
+	)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &user, nil
 }

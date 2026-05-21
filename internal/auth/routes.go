@@ -1,6 +1,8 @@
 package auth
 
 import (
+	"github.com/bellapacx/kids-utopia/pkg/config"
+	"github.com/bellapacx/kids-utopia/pkg/middleware"
 	"github.com/gin-gonic/gin"
 )
 
@@ -14,6 +16,9 @@ func NewRoutes(handler *Handler) *Routes {
 
 func (r *Routes) Register(group *gin.RouterGroup) {
 
+
+	cfg := config.Load()
+
 	auth := group.Group("/auth")
 	{
 		auth.POST("/register", r.handler.Register)
@@ -23,5 +28,22 @@ func (r *Routes) Register(group *gin.RouterGroup) {
 		auth.POST("/forgot-password", r.handler.ForgotPassword)
 	auth.POST("/reset-password", r.handler.ResetPassword)
 	auth.POST("/logout", r.handler.Logout)
+	auth.POST("/resend-otp", r.handler.ResendOTP)
+	auth.POST("/verify-phone", r.handler.VerifyPhone)
+	auth.POST("/verify-email", r.handler.VerifyEmail)
 	}
+	// PROTECTED ROUTES
+	protected := group.Group("/auth")
+
+	protected.Use(
+		middleware.AuthMiddleware(cfg.JWTSecret),
+	)
+
+	{
+		protected.GET(
+			"/verification-session",
+			r.handler.VerificationSession,
+		)
+	}
+
 }

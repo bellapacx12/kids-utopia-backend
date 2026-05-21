@@ -83,16 +83,22 @@ func (s *BookService) UploadBook(fileName string, fileURL string) (*model.Book, 
 func (s *BookService) UploadToStorage(ctx context.Context, file multipart.File, fileName string) (string, error) {
 	return s.storage.UploadFile(ctx, file, fileName)
 }
-func (s *BookService) CreateUploadedBook(ctx context.Context, fileName, url string) (*model.Book, error) {
-    log.Println("🔥 CreateUploadedBook called:", fileName)
+func (s *BookService) CreateUploadedBook(
+	ctx context.Context,
+	title string,
+	author string,
+	url string,
+) (*model.Book, error) {
+    log.Println("🔥 CreateUploadedBook called:", title)
 	book := &model.Book{
-		ID:        uuid.NewString(),
-		Title:     fileName,
-		CoverURL:  url,
-		Status:    "processing",
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
-	}
+	ID:        uuid.NewString(),
+	Title:     title,
+	Author:    author,
+	CoverURL:  url,
+	Status:    "processing",
+	CreatedAt: time.Now(),
+	UpdatedAt: time.Now(),
+}
 	
 
 	// 1. Save to DB

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/bellapacx/kids-utopia/internal/notifications/otp"
+	"github.com/bellapacx/kids-utopia/pkg/database"
 	"github.com/bellapacx/kids-utopia/pkg/redis"
 	"github.com/bellapacx/kids-utopia/pkg/security"
 
@@ -99,9 +100,11 @@ if val >= 5 {
 	}
 
 	// BLOCK UNVERIFIED USERS
-	if !user.IsVerified {
-		return nil, errors.New("account not verified")
-	}
+	// EMAIL VERIFICATION
+// allow login if either email OR phone is verified
+if !user.EmailVerified && !user.PhoneVerified {
+	return nil, errors.New("account not verified")
+}
 
 	// PASSWORD CHECK
 	if !security.CheckPassword(user.PasswordHash, req.Password) {
@@ -299,4 +302,112 @@ func (s *Service) Logout(ctx context.Context, refreshToken string) error {
 	}
 
 	return nil
+}
+func (s *Service) VerifyEmail(
+	ctx context.Context,
+	req VerifyEmailRequest,
+) error {
+
+	email := strings.ToLower(strings.TrimSpace(req.Email))
+
+	ok := s.otpService.Verify(email, req.Code)
+	if !ok {
+		return errors.New("invalid otp")
+	}
+
+	return s.repo.VerifyEmail(ctx, email)
+}
+func (s *Service) VerifyPhone(
+	ctx context.Context,
+	req VerifyPhoneRequest,
+) error {
+
+	phone := strings.TrimSpace(req.Phone)
+
+	ok := s.otpService.Verify(phone, req.Code)
+	if !ok {
+		return errors.New("invalid otp")
+	}
+
+	return s.repo.VerifyPhone(ctx, phone)
+}
+func (s *Service) ResendOTP(
+	ctx context.Context,
+	req ResendOTPRequest,
+) error {
+
+	identifier := strings.ToLower(
+		strings.TrimSpace(req.Identifier),
+	)
+
+	user, err := s.repo.FindByIdentifier(ctx, identifier)
+	if err != nil {
+		return errors.New("user not found")
+	}
+
+	// already verified
+	if user.EmailVerified || user.PhoneVerified {
+		return errors.New("account already verified")
+	}
+
+	code := generateOTP()
+
+	StoreOTP(identifier, code)
+
+	return s.otpService.Send(identifier, code)
+}
+
+func (s *Service) VerificationSession(
+	ctx context.Context,
+	userID string,
+) (*VerificationSessionResponse, error) {
+
+	user, err := s.repo.FindByID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &VerificationSessionResponse{
+		Verified:      user.EmailVerified || user.PhoneVerified,
+		EmailVerified: user.EmailVerified,
+		PhoneVerified: user.PhoneVerified,
+	}, nil
+}
+func (r *Repository) FindByID(
+	ctx context.Context,
+	userID string,
+) (*User, error) {
+
+	var user User
+
+	err := database.DB.QueryRow(ctx, `
+		SELECT
+			id,
+			name,
+			email,
+			phone,
+			password_hash,
+			role,
+			is_verified,
+			email_verified,
+			phone_verified,
+		FROM users
+		WHERE id = $1
+	`, userID).Scan(
+		&user.ID,
+		&user.Name,
+		&user.Email,
+		&user.Phone,
+		&user.PasswordHash,
+		&user.Role,
+		&user.IsVerified,
+		&user.EmailVerified,
+		&user.PhoneVerified,
+	)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &user, nil
 }

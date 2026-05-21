@@ -181,3 +181,95 @@ func (h *Handler) Logout(c *gin.Context) {
 		"message": "logged out successfully",
 	})
 }
+func (h *Handler) ResendOTP(c *gin.Context) {
+
+	var req ResendOTPRequest
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	err := h.service.ResendOTP(c.Request.Context(), req)
+	if err != nil {
+		c.JSON(400, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(200, gin.H{
+		"message": "otp resent",
+	})
+}
+func (h *Handler) VerificationSession(c *gin.Context) {
+
+	userID := c.GetString("user_id")
+
+	res, err := h.service.VerificationSession(
+		c.Request.Context(),
+		userID,
+	)
+	if err != nil {
+		c.JSON(400, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(200, res)
+}
+func (h *Handler) VerifyEmail(c *gin.Context) {
+
+	var req VerifyEmailRequest
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	err := h.service.VerifyEmail(
+		c.Request.Context(),
+		req,
+	)
+	if err != nil {
+		c.JSON(400, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(200, gin.H{
+		"message": "email verified successfully",
+	})
+}
+func (h *Handler) VerifyPhone(c *gin.Context) {
+
+	var req VerifyPhoneRequest
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	err := h.service.VerifyPhone(
+		c.Request.Context(),
+		req,
+	)
+	if err != nil {
+		c.JSON(400, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(200, gin.H{
+		"message": "phone verified successfully",
+	})
+}

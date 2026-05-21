@@ -37,3 +37,20 @@ type ResetPasswordRequest struct {
 type LogoutRequest struct {
 	RefreshToken string `json:"refresh_token"`
 }
+type VerifyEmailRequest struct {
+	Email string `json:"email"`
+	Code  string `json:"code"`
+}
+
+type VerifyPhoneRequest struct {
+	Phone string `json:"phone"`
+	Code  string `json:"code"`
+}
+type ResendOTPRequest struct {
+	Identifier string `json:"identifier"`
+}
+type VerificationSessionResponse struct {
+	Verified       bool `json:"verified"`
+	EmailVerified  bool `json:"email_verified"`
+	PhoneVerified  bool `json:"phone_verified"`
+}
