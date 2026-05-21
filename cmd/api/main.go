@@ -212,7 +212,7 @@ bookHandler := handler.NewBookHandler(bookService)
 // SUBSCRIPTIONS
 // =========================
 
-bookHandler = handler.NewBookHandler(bookService)
+
 editorService := service.NewEditorService(
 	bookRepo,
 	bookPagesRepo,
