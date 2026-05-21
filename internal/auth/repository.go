@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"strings"
 
 	"github.com/bellapacx/kids-utopia/pkg/database"
 	"github.com/bellapacx/kids-utopia/pkg/security"
@@ -85,10 +86,28 @@ func (r *Repository) VerifyUser(
 	identifier string,
 ) error {
 
+	identifier = strings.TrimSpace(identifier)
+
+	if strings.Contains(identifier, "@") {
+		// EMAIL
+		_, err := database.DB.Exec(ctx, `
+			UPDATE users
+			SET 
+				email_verified = true,
+				is_verified = email_verified OR phone_verified
+			WHERE email = $1
+		`, identifier)
+
+		return err
+	}
+
+	// PHONE
 	_, err := database.DB.Exec(ctx, `
 		UPDATE users
-		SET is_verified = true
-		WHERE email = $1 OR phone = $1
+		SET 
+			phone_verified = true,
+			is_verified = email_verified OR phone_verified
+		WHERE phone = $1
 	`, identifier)
 
 	return err
