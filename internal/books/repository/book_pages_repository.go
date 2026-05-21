@@ -19,21 +19,7 @@ type bookPagesRepo struct {
 	db *pgxpool.Pool
 }
 
-func (r *bookPagesRepo) UpdateCoverURL(ctx context.Context, bookID string, coverURL string) error {
-	query := `
-		UPDATE books
-		SET cover_url = $1,
-		    updated_at = NOW()
-		WHERE id = $2
-	`
 
-	_, err := r.db.Exec(ctx, query, coverURL, bookID)
-	if err != nil {
-		return fmt.Errorf("update cover_url failed: %w", err)
-	}
-
-	return nil
-}
 func NewBookPagesRepository(db *pgxpool.Pool) BookPagesRepository {
 	return &bookPagesRepo{db: db}
 }
@@ -117,4 +103,19 @@ func (r *bookPagesRepo) SavePages(
 	}
 
 	return tx.Commit(ctx)
+}
+func (r *bookPagesRepo) UpdateCoverURL(ctx context.Context, bookID string, coverURL string) error {
+	query := `
+		UPDATE books
+		SET cover_url = $1,
+		    updated_at = NOW()
+		WHERE id = $2
+	`
+
+	_, err := r.db.Exec(ctx, query, coverURL, bookID)
+	if err != nil {
+		return fmt.Errorf("update cover_url failed: %w", err)
+	}
+
+	return nil
 }

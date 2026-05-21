@@ -124,6 +124,29 @@ for i := range textPages {
 		ImageKey:   imageKeys[i],
 	}
 }
+// =========================
+// STEP 6.5: SET COVER IMAGE
+// =========================
+log.Printf("🧩 [STEP 6.5] Preparing cover image for book=%s", event.BookID)
+
+if len(imageKeys) == 0 {
+	log.Printf("⚠️ [STEP 6.5] No images found, skipping cover update (book=%s)", event.BookID)
+} else {
+
+	coverKey := imageKeys[0]
+	log.Printf("🖼️ [STEP 6.5] Cover selected key=%s (book=%s)", coverKey, event.BookID)
+
+	coverURL := st.GetPublicURL(coverKey)
+	log.Printf("🔗 [STEP 6.5] Generated cover URL=%s (book=%s)", coverURL, event.BookID)
+
+	err = repo.UpdateCoverURL(ctx, event.BookID, coverURL)
+	if err != nil {
+		log.Printf("❌ [STEP 6.5] DB update failed (book=%s): %v", event.BookID, err)
+		return err
+	}
+
+	log.Printf("✅ [STEP 6.5] Cover URL successfully saved (book=%s)", event.BookID)
+}
 
 err = repo.SavePages(ctx, event.BookID, pages)
 if err != nil {
