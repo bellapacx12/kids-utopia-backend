@@ -302,20 +302,20 @@ func (s *Service) Logout(ctx context.Context, refreshToken string) error {
 
 	return nil
 }
-func (s *Service) VerifyEmail(
-	ctx context.Context,
-	req VerifyEmailRequest,
-) error {
+	func (s *Service) VerifyEmail(
+		ctx context.Context,
+		req VerifyEmailRequest,
+	) error {
 
-	email := strings.ToLower(strings.TrimSpace(req.Email))
+		email := strings.ToLower(strings.TrimSpace(req.Email))
 
-	ok := s.otpService.Verify(email, req.Code)
-	if !ok {
-		return errors.New("invalid otp")
+		ok := s.otpService.Verify(email, req.Code)
+		if !ok {
+			return errors.New("invalid otp")
+		}
+
+		return s.repo.VerifyEmail(ctx, email)
 	}
-
-	return s.repo.VerifyEmail(ctx, email)
-}
 func (s *Service) VerifyPhone(
 	ctx context.Context,
 	req VerifyPhoneRequest,
@@ -371,4 +371,32 @@ func (s *Service) VerificationSession(
 		EmailVerified: user.EmailVerified,
 		PhoneVerified: user.PhoneVerified,
 	}, nil
+}
+func (s *Service) SendEmailOTP(
+	ctx context.Context,
+	req SendEmailOTPRequest,
+) error {
+
+	email := strings.ToLower(
+		strings.TrimSpace(req.Email),
+	)
+
+	code := generateOTP()
+
+	StoreOTP(email, code)
+
+	return s.otpService.Send(email, code)
+}
+func (s *Service) SendPhoneOTP(
+	ctx context.Context,
+	req SendPhoneOTPRequest,
+) error {
+
+	phone := strings.TrimSpace(req.Phone)
+
+	code := generateOTP()
+
+	StoreOTP(phone, code)
+
+	return s.otpService.Send(phone, code)
 }

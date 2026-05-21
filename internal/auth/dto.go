@@ -38,13 +38,13 @@ type LogoutRequest struct {
 	RefreshToken string `json:"refresh_token"`
 }
 type VerifyEmailRequest struct {
-	Email string `json:"email"`
-	Code  string `json:"code"`
+	Email string `json:"email" binding:"required,email"`
+	Code  string `json:"code" binding:"required"`
 }
 
 type VerifyPhoneRequest struct {
-	Phone string `json:"phone"`
-	Code  string `json:"code"`
+	Phone string `json:"phone" binding:"required"`
+	Code  string `json:"code" binding:"required"`
 }
 type ResendOTPRequest struct {
 	Identifier string `json:"identifier"`
@@ -53,4 +53,10 @@ type VerificationSessionResponse struct {
 	Verified       bool `json:"verified"`
 	EmailVerified  bool `json:"email_verified"`
 	PhoneVerified  bool `json:"phone_verified"`
+}
+type SendEmailOTPRequest struct {
+	Email string `json:"email" binding:"required,email"`
+}
+type SendPhoneOTPRequest struct {
+	Phone string `json:"phone" binding:"required"`
 }

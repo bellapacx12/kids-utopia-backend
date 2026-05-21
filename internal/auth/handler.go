@@ -273,3 +273,55 @@ func (h *Handler) VerifyPhone(c *gin.Context) {
 		"message": "phone verified successfully",
 	})
 }
+func (h *Handler) SendEmailOTP(c *gin.Context) {
+
+	var req SendEmailOTPRequest
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	err := h.service.SendEmailOTP(
+		c.Request.Context(),
+		req,
+	)
+	if err != nil {
+		c.JSON(400, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(200, gin.H{
+		"message": "otp sent successfully",
+	})
+}
+func (h *Handler) SendPhoneOTP(c *gin.Context) {
+
+	var req SendPhoneOTPRequest
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	err := h.service.SendPhoneOTP(
+		c.Request.Context(),
+		req,
+	)
+	if err != nil {
+		c.JSON(400, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(200, gin.H{
+		"message": "otp sent to phone",
+	})
+}
