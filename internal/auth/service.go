@@ -302,19 +302,19 @@ func (s *Service) Logout(ctx context.Context, refreshToken string) error {
 
 	return nil
 }
-	func (s *Service) VerifyEmail(
+func (s *Service) VerifyEmail(
 		ctx context.Context,
 		req VerifyEmailRequest,
 	) error {
 
-		email := strings.ToLower(strings.TrimSpace(req.Email))
+			key := strings.ToLower(strings.TrimSpace(req.Email))
 
-		ok := s.otpService.Verify(email, req.Code)
+		ok := s.otpService.Verify(key, req.Code)
 		if !ok {
 			return errors.New("invalid otp")
 		}
 
-		return s.repo.VerifyEmail(ctx, email)
+		return s.repo.VerifyEmail(ctx, key)
 	}
 func (s *Service) VerifyPhone(
 	ctx context.Context,
@@ -335,11 +335,9 @@ func (s *Service) ResendOTP(
 	req ResendOTPRequest,
 ) error {
 
-	identifier := strings.ToLower(
-		strings.TrimSpace(req.Identifier),
-	)
+		key := strings.ToLower(strings.TrimSpace(req.Identifier))
 
-	user, err := s.repo.FindByIdentifier(ctx, identifier)
+	user, err := s.repo.FindByIdentifier(ctx, key)
 	if err != nil {
 		return errors.New("user not found")
 	}
@@ -351,9 +349,9 @@ func (s *Service) ResendOTP(
 
 	code := generateOTP()
 
-	StoreOTP(identifier, code)
+	StoreOTP(key, code)
 
-	return s.otpService.Send(identifier, code)
+	return s.otpService.Send(key, code)
 }
 
 func (s *Service) VerificationSession(
@@ -377,26 +375,24 @@ func (s *Service) SendEmailOTP(
 	req SendEmailOTPRequest,
 ) error {
 
-	email := strings.ToLower(
-		strings.TrimSpace(req.Email),
-	)
+		key := strings.ToLower(strings.TrimSpace(req.Email))
 
 	code := generateOTP()
 
-	StoreOTP(email, code)
+	StoreOTP(key, code)
 
-	return s.otpService.Send(email, code)
+	return s.otpService.Send(key, code)
 }
 func (s *Service) SendPhoneOTP(
 	ctx context.Context,
 	req SendPhoneOTPRequest,
 ) error {
 
-	phone := strings.TrimSpace(req.Phone)
+	key := strings.ToLower(strings.TrimSpace(req.Phone))
 
 	code := generateOTP()
 
-	StoreOTP(phone, code)
+	StoreOTP(key, code)
 
-	return s.otpService.Send(phone, code)
+	return s.otpService.Send(key, code)
 }

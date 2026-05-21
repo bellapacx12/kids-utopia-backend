@@ -32,6 +32,7 @@ func (r *Routes) Register(group *gin.RouterGroup) {
 	auth.POST("/verify-phone", r.handler.VerifyPhone)
 	auth.POST("/verify-email", r.handler.VerifyEmail)
 	auth.POST("/send-email-otp", r.handler.SendEmailOTP)
+	auth.POST("/send-phone-otp", r.handler.SendPhoneOTP)
 	}
 	// PROTECTED ROUTES
 	protected := group.Group("/auth")
