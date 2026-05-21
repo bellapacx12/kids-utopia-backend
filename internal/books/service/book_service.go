@@ -7,32 +7,36 @@ import (
 	"mime/multipart"
 	"time"
 
-	"github.com/google/uuid"
-
+	"github.com/bellapacx/kids-utopia/internal/access/service"
+	accessservice "github.com/bellapacx/kids-utopia/internal/access/service"
 	"github.com/bellapacx/kids-utopia/internal/books/dto"
 	"github.com/bellapacx/kids-utopia/internal/books/events"
 	"github.com/bellapacx/kids-utopia/internal/books/model"
 	"github.com/bellapacx/kids-utopia/internal/books/repository"
 	"github.com/bellapacx/kids-utopia/pkg/sqs"
 	"github.com/bellapacx/kids-utopia/pkg/storage"
+	"github.com/google/uuid"
 )
 
 type BookService struct {
 	repo repository.BookRepository
 	storage  storage.Storage
 queue   *sqs.Client
+accessService *service.Service
 }
 
 func NewBookService(
 	repo repository.BookRepository,
 	storage storage.Storage,
 	queue *sqs.Client,
+	accessService *accessservice.Service,
 ) *BookService {
 
 	return &BookService{
 		repo:     repo,
 		storage:  storage,
 		queue: queue,
+		accessService: accessService,
 	}
 }
 
@@ -137,4 +141,48 @@ func (s *BookService) ListBooks(
 	offset := (page - 1) * limit
 
 	return s.repo.ListBooks(ctx, limit, offset)
+}
+func (s *BookService) GetBookByIDs(
+	ctx context.Context,
+	bookID string,
+	userID string,
+	role string,
+) (*model.Book, []model.BookPage, error) {
+
+	book, err := s.repo.GetBookByID(ctx, bookID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// =========================
+	// EDITOR BYPASS
+	// =========================
+	if role == "editor" || role == "admin" {
+		pages, _ := s.repo.GetBookPages(ctx, bookID)
+		return book, pages, nil
+	}
+
+	// =========================
+	// ACCESS CHECK (YOUR MODULE)
+	// =========================
+	allowed, err := s.accessService.CanAccessBook(ctx, userID, book)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if !allowed {
+		// return preview only
+		pages, _ := s.repo.GetBookPreview(ctx, bookID)
+		return book, pages, nil
+	}
+
+	// =========================
+	// FULL ACCESS
+	// =========================
+	pages, err := s.repo.GetBookPages(ctx, bookID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return book, pages, nil
 }

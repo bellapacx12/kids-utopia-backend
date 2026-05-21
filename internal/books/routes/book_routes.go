@@ -13,13 +13,12 @@ func RegisterBookRoutes(
 
 	books.POST("/", h.CreateBook)
 
-	books.GET("/:id", h.GetBook)
+	books.GET("/:id", h.GetBooks)
 
 	books.POST("/upload", h.UploadBook)
-
-
 		// =========================
 		// GET BOOKS (LIST)
 		// =========================
-		books.GET("/", h.ListBooks)
+	books.GET("/", h.ListBooks)
+	
 }

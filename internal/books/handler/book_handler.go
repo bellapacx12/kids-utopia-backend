@@ -9,6 +9,7 @@ import (
 
 	"github.com/bellapacx/kids-utopia/internal/books/dto"
 	"github.com/bellapacx/kids-utopia/internal/books/service"
+	"github.com/bellapacx/kids-utopia/pkg/contextkeys"
 )
 
 type BookHandler struct {
@@ -163,6 +164,42 @@ func (h *BookHandler) ListBooks(c *gin.Context) {
 			"total": total,
 			"page":  page,
 			"limit": limit,
+		},
+	})
+}
+func (h *BookHandler) GetBooks(c *gin.Context) {
+
+	bookID := c.Param("id")
+
+	userID := c.GetString(contextkeys.UserID)
+	role := c.GetString(contextkeys.Role)
+
+	// =========================
+	// SERVICE CALL
+	// =========================
+
+	book, pages, err := h.service.GetBookByIDs(
+		c.Request.Context(),
+		bookID,
+		userID,
+		role,
+	)
+
+	if err != nil {
+		c.JSON(404, gin.H{
+			"error": "book not found",
+		})
+		return
+	}
+
+	// =========================
+	// RESPONSE
+	// =========================
+
+	c.JSON(200, gin.H{
+		"data": gin.H{
+			"book":  book,
+			"pages": pages,
 		},
 	})
 }

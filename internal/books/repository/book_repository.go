@@ -12,6 +12,15 @@ type BookRepository interface {
 	FindByID(ctx context.Context, id string) (*model.Book, error)
 	UpdateStatus(ctx context.Context, id string, status string) error
 	ListBooks(ctx context.Context, limit int, offset int) ([]model.Book, int, error)
+
+	// ✅ ADD THIS
+	GetBookByID(ctx context.Context, id string) (*model.Book, error)
+
+	// ✅ ADD THIS
+	GetBookPages(ctx context.Context, bookID string) ([]model.BookPage, error)
+
+	// ✅ ADD THIS
+	GetBookPreview(ctx context.Context, bookID string) ([]model.BookPage, error)
 }
 func (r *bookRepository) ListBooks(
 	ctx context.Context,

@@ -38,6 +38,7 @@ import (
 	subscriptionrepository "github.com/bellapacx/kids-utopia/internal/subscriptions/repository"
 	subscriptionroutes "github.com/bellapacx/kids-utopia/internal/subscriptions/routes"
 	subscriptionservice "github.com/bellapacx/kids-utopia/internal/subscriptions/service"
+
 	"github.com/bellapacx/kids-utopia/pkg/config"
 	"github.com/bellapacx/kids-utopia/pkg/contextkeys"
 	"github.com/bellapacx/kids-utopia/pkg/database"
@@ -190,15 +191,19 @@ authRoutes.Register(r.Group("/api/v1"))
 	// Books ROUTES
 	// ================================
 
-
-    
-
 bookRepo := repository.NewBookRepository()
+subRepo := subscriptionrepository.New(database.DB)
+bookPagesRepo := repository.NewBookPagesRepository(database.DB)
+
+subService := subscriptionservice.New(subRepo)
+accessSvc := accessservice.New(subService)
+
 
 bookService := service.NewBookService(
 	bookRepo,
 	storageClient,
 	queue,
+	accessSvc,
 )
 
 bookHandler := handler.NewBookHandler(bookService)
@@ -207,22 +212,20 @@ bookHandler := handler.NewBookHandler(bookService)
 // SUBSCRIPTIONS
 // =========================
 
-subRepo := subscriptionrepository.New(database.DB)
-
-subService := subscriptionservice.New(subRepo)
+bookHandler = handler.NewBookHandler(bookService)
+editorService := service.NewEditorService(
+	bookRepo,
+	bookPagesRepo,
+	storageClient,
+)
 
 subHandler := subscriptionhandler.New(subService)
-subscriptionroutes.RegisterSubscriptionRoutes(api, subHandler)
-// =========================
-// ACCESS CONTROL
-// =========================
-
-accessSvc := accessservice.New(subService)
-
+editorHandler := handler.NewEditorHandler(editorService)
 accessMw := accessmiddleware.New(
 	accessSvc,
 	bookRepo,
 )
+
 
 // =========================
 // BOOK ROUTES
@@ -238,20 +241,10 @@ readerGroup.Use(
 	accessMw.CheckBookAccess(),
 )
 
-routes.RegisterBookRoutes(
-	readerGroup,
-	bookHandler,
-)
-bookPagesRepo := repository.NewBookPagesRepository(database.DB)
+routes.RegisterBookRoutes(readerGroup, bookHandler)
 
-editorService := service.NewEditorService(
-	bookRepo,
-	bookPagesRepo,
-	storageClient,
-)
 
-editorHandler := handler.NewEditorHandler(editorService)
-
+subscriptionroutes.RegisterSubscriptionRoutes(api, subHandler)
 editorGroup := r.Group("/api/v1/editor")
 
 editorGroup.Use(

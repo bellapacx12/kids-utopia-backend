@@ -69,64 +69,105 @@ func (r *bookRepository) UpdateStatus(ctx context.Context, id string, status str
 
 	return err
 }
-func (r *bookRepository) ListBooks(
+
+func (r *bookRepository) GetBookByID(
 	ctx context.Context,
-	limit int,
-	offset int,
-) ([]model.Book, int, error) {
+	id string,
+) (*model.Book, error) {
+
+	var b model.Book
 
 	query := `
-		SELECT id, title, author, cover_url, status, created_at
+		SELECT id, title, author, cover_url, access_type, created_at
 		FROM books
-		ORDER BY created_at DESC
-		LIMIT $1 OFFSET $2
+		WHERE id = $1
 	`
 
-	rows, err := database.DB.Query(ctx, query, limit, offset)
+	err := database.DB.QueryRow(ctx, query, id).Scan(
+		&b.ID,
+		&b.Title,
+		&b.Author,
+		&b.CoverURL,
+		&b.AccessType,
+		&b.CreatedAt,
+	)
+
 	if err != nil {
-		return nil, 0, err
+		return nil, err
+	}
+
+	return &b, nil
+}
+func (r *bookRepository) GetBookPages(
+	ctx context.Context,
+	bookID string,
+) ([]model.BookPage, error) {
+
+	query := `
+		SELECT page_number, content, image_url
+		FROM book_pages
+		WHERE book_id = $1
+		ORDER BY page_number ASC
+	`
+
+	rows, err := database.DB.Query(ctx, query, bookID)
+	if err != nil {
+		return nil, err
 	}
 	defer rows.Close()
 
-	var books []model.Book
+	var pages []model.BookPage
 
 	for rows.Next() {
-		var b model.Book
+		var p model.BookPage
 
-		err := rows.Scan(
-			&b.ID,
-			&b.Title,
-			&b.Author,
-			&b.CoverURL,
-			&b.Status,
-			&b.CreatedAt,
-		)
-		if err != nil {
-			return nil, 0, err
+		if err := rows.Scan(
+			&p.PageNumber,
+			&p.Content,
+			&p.ImageURL,
+		); err != nil {
+			return nil, err
 		}
 
-		books = append(books, b)
+		pages = append(pages, p)
 	}
 
-	if rows.Err() != nil {
-		return nil, 0, rows.Err()
-	}
+	return pages, nil
+}
+func (r *bookRepository) GetBookPreview(
+	ctx context.Context,
+	bookID string,
+) ([]model.BookPage, error) {
 
-	// =========================
-	// COUNT QUERY
-	// =========================
-
-	var total int
-
-	countQuery := `
-		SELECT COUNT(*)
-		FROM books
+	query := `
+		SELECT page_number, content, image_url
+		FROM book_pages
+		WHERE book_id = $1
+		ORDER BY page_number ASC
+		LIMIT 2
 	`
 
-	err = database.DB.QueryRow(ctx, countQuery).Scan(&total)
+	rows, err := database.DB.Query(ctx, query, bookID)
 	if err != nil {
-		return nil, 0, err
+		return nil, err
+	}
+	defer rows.Close()
+
+	var pages []model.BookPage
+
+	for rows.Next() {
+		var p model.BookPage
+
+		if err := rows.Scan(
+			&p.PageNumber,
+			&p.Content,
+			&p.ImageURL,
+		); err != nil {
+			return nil, err
+		}
+
+		pages = append(pages, p)
 	}
 
-	return books, total, nil
+	return pages, nil
 }
