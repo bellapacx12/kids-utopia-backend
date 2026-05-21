@@ -16,4 +16,10 @@ func RegisterBookRoutes(
 	books.GET("/:id", h.GetBook)
 
 	books.POST("/upload", h.UploadBook)
+
+
+		// =========================
+		// GET BOOKS (LIST)
+		// =========================
+		books.GET("/", h.ListBooks)
 }

@@ -128,3 +128,13 @@ if err != nil {
 
 	return book, nil
 }
+func (s *BookService) ListBooks(
+	ctx context.Context,
+	page int,
+	limit int,
+) ([]model.Book, int, error) {
+
+	offset := (page - 1) * limit
+
+	return s.repo.ListBooks(ctx, limit, offset)
+}

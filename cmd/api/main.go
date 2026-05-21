@@ -266,7 +266,7 @@ editorroutes.RegisterEditorRoutes(
 	editorGroup,
 	editorHandler,
 )
-editorroutes.RegisterEditorRoutes(api, editorHandler)
+
 // ================================
 // USERS MODULE
 // ================================

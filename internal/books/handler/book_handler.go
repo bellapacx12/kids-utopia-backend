@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 
@@ -109,5 +110,59 @@ if title == "" || author == "" {
 
 	c.JSON(200, gin.H{
 		"data": book,
+	})
+}
+func (h *BookHandler) ListBooks(c *gin.Context) {
+
+	page := 1
+	limit := 20
+
+	// =========================
+	// QUERY PARAMS
+	// =========================
+
+	if p := c.Query("page"); p != "" {
+		fmt.Sscanf(p, "%d", &page)
+	}
+
+	if l := c.Query("limit"); l != "" {
+		fmt.Sscanf(l, "%d", &limit)
+	}
+
+	// safety fallback
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 || limit > 100 {
+		limit = 20
+	}
+
+	// =========================
+	// SERVICE CALL
+	// =========================
+
+	books, total, err := h.service.ListBooks(
+		c.Request.Context(),
+		page,
+		limit,
+	)
+	if err != nil {
+		c.JSON(500, gin.H{
+			"error": "failed to fetch books",
+		})
+		return
+	}
+
+	// =========================
+	// RESPONSE
+	// =========================
+
+	c.JSON(200, gin.H{
+		"data": books,
+		"meta": gin.H{
+			"total": total,
+			"page":  page,
+			"limit": limit,
+		},
 	})
 }
