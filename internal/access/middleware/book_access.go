@@ -31,35 +31,62 @@ func (m *Middleware) CheckBookAccess() gin.HandlerFunc {
 		// =========================
 		// ROLE BYPASS
 		// =========================
-
 		role := c.GetString(contextkeys.Role)
 
 		if role == "editor" ||
 			role == "admin" ||
 			role == "super_admin" {
-
 			c.Next()
 			return
 		}
 
 		// =========================
-		// NORMAL ACCESS FLOW
+		// BOOK ID
 		// =========================
-
 		bookID := c.Param("id")
+		if bookID == "" {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "missing book id",
+			})
+			c.Abort()
+			return
+		}
 
-		userID := c.GetString(contextkeys.UserID)
-
+		// =========================
+		// FETCH BOOK
+		// =========================
 		book, err := m.bookRepo.FindByID(c, bookID)
 		if err != nil {
 			c.JSON(http.StatusNotFound, gin.H{
 				"error": "book not found",
 			})
-
 			c.Abort()
 			return
 		}
 
+		// =========================
+		// ⭐ FREE ACCESS CHECK (NEW)
+		// =========================
+		if book.AccessType == "free" {
+			c.Next()
+			return
+		}
+
+		// =========================
+		// AUTH CHECK
+		// =========================
+		userID := c.GetString(contextkeys.UserID)
+		if userID == "" {
+			c.JSON(http.StatusUnauthorized, gin.H{
+				"error": "unauthorized",
+			})
+			c.Abort()
+			return
+		}
+
+		// =========================
+		// SUBSCRIPTION CHECK
+		// =========================
 		ok, err := m.accessService.CanAccessBook(
 			c,
 			userID,
@@ -70,7 +97,6 @@ func (m *Middleware) CheckBookAccess() gin.HandlerFunc {
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"error": "access error",
 			})
-
 			c.Abort()
 			return
 		}
@@ -79,7 +105,6 @@ func (m *Middleware) CheckBookAccess() gin.HandlerFunc {
 			c.JSON(http.StatusForbidden, gin.H{
 				"error": "premium subscription required",
 			})
-
 			c.Abort()
 			return
 		}
