@@ -87,31 +87,38 @@ func (m *Middleware) CheckBookAccess() gin.HandlerFunc {
 
 		// =========================
 		// SUBSCRIPTION CHECK
-		// =========================
 		ok, err := m.accessService.CanAccessBook(
-			c,
-			userID,
-			book,
-		)
+	c,
+	userID,
+	book,
+)
 
-		if err != nil {
-	log.Printf("❌ CanAccessBook failed: userID=%s bookID=%s err=%v",
-		userID, bookID, err)
+if err != nil {
+	log.Printf(
+		"❌ CanAccessBook failed: userID=%s bookID=%s err=%v",
+		userID,
+		bookID,
+		err,
+	)
 
 	c.JSON(http.StatusInternalServerError, gin.H{
-		"error": err.Error(),
+		"error": "internal server error",
 	})
+
 	c.Abort()
 	return
 }
 
-		if !ok {
-			c.JSON(http.StatusForbidden, gin.H{
-				"error": "premium subscription required",
-			})
-			c.Abort()
-			return
-		}
+if !ok {
+	c.JSON(http.StatusForbidden, gin.H{
+		"error": "premium subscription required",
+	})
+
+	c.Abort()
+	return
+}
+		
+            
 
 		c.Next()
 	}
