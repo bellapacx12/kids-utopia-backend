@@ -124,6 +124,12 @@ for i := range textPages {
 		ImageKey:   imageKeys[i],
 	}
 }
+
+err = repo.SavePages(ctx, event.BookID, pages)
+if err != nil {
+	log.Printf("❌ save error (book=%s): %v", event.BookID, err)
+	return err
+}
 // =========================
 // STEP 6.5: SET COVER IMAGE
 // =========================
@@ -148,11 +154,6 @@ if len(imageKeys) == 0 {
 	log.Printf("✅ [STEP 6.5] Cover URL successfully saved (book=%s)", event.BookID)
 }
 
-err = repo.SavePages(ctx, event.BookID, pages)
-if err != nil {
-	log.Printf("❌ save error (book=%s): %v", event.BookID, err)
-	return err
-}
 
 	log.Printf(
 		"✅ Book processed successfully: %s (pages=%d)",

@@ -155,14 +155,6 @@ func (s *BookService) GetBookByIDs(
 	}
 
 	// =========================
-	// EDITOR BYPASS
-	// =========================
-	if role == "editor" || role == "admin" {
-		pages, _ := s.repo.GetBookPages(ctx, bookID)
-		return book, pages, nil
-	}
-
-	// =========================
 	// ACCESS CHECK (YOUR MODULE)
 	// =========================
 	allowed, err := s.accessService.CanAccessBook(ctx, userID, book)
