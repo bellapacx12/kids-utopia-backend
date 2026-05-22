@@ -182,10 +182,33 @@ r.GET("/health", func(c *gin.Context) {
 	// =========================
 	readerGroup := r.Group("/api/v1/books")
 
-	readerGroup.Use(middleware.AuthMiddleware(cfg.JWTSecret))
-	readerGroup.Use(accessMw.CheckBookAccess())
+readerGroup.Use(
+	middleware.AuthMiddleware(cfg.JWTSecret),
+)
 
-	bookroutes.RegisterBookRoutes(readerGroup, bookHandler)
+readerGroup.Use(
+	accessMw.CheckBookAccess(),
+)
+
+bookroutes.RegisterReaderRoutes(
+	readerGroup,
+	bookHandler,
+)
+editorBooks := r.Group("/api/v1/books")
+
+editorBooks.Use(
+	middleware.AuthMiddleware(cfg.JWTSecret),
+)
+
+editorBooks.Use(
+	middleware.RequireRoles("editor", "admin"),
+)
+
+bookroutes.RegisterEditorBookRoutes(
+	editorBooks,
+	bookHandler,
+)
+	
 
 	// =========================
 	// SUBSCRIPTIONS ROUTES
