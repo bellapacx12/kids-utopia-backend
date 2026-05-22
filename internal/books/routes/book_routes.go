@@ -3,6 +3,7 @@ package routes
 import (
 	"github.com/gin-gonic/gin"
 
+	accessmiddleware "github.com/bellapacx/kids-utopia/internal/access/middleware"
 	"github.com/bellapacx/kids-utopia/internal/books/handler"
 )
 
@@ -13,11 +14,18 @@ import (
 func RegisterReaderRoutes(
 	books *gin.RouterGroup,
 	h *handler.BookHandler,
+	accessMw *accessmiddleware.Middleware,
 ) {
 
+	// LIST BOOKS
 	books.GET("/", h.ListBooks)
 
-	books.GET("/:id", h.GetBooks)
+	// SINGLE BOOK ACCESS CHECK
+	books.GET(
+		"/:id",
+		accessMw.CheckBookAccess(),
+		h.GetBooks,
+	)
 }
 
 // =========================

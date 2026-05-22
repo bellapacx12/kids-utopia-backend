@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"log"
 	"net/http"
 	"strings"
 
@@ -40,7 +41,8 @@ func AuthMiddleware(secret string) gin.HandlerFunc {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid claims"})
 			return
 		}
-
+        // 🔥 ADD THIS LOG
+log.Printf("🔐 USER AUTH: user_id=%s role=%s", claims.UserID, claims.Role)
 		// ✅ CLEAN INJECTION (FIXED)
 		c.Set(contextkeys.UserID, claims.UserID)
 		c.Set(contextkeys.Role, claims.Role)

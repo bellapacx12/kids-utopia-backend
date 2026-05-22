@@ -186,13 +186,10 @@ readerGroup.Use(
 	middleware.AuthMiddleware(cfg.JWTSecret),
 )
 
-readerGroup.Use(
-	accessMw.CheckBookAccess(),
-)
-
 bookroutes.RegisterReaderRoutes(
 	readerGroup,
 	bookHandler,
+	accessMw,
 )
 editorBooks := r.Group("/api/v1/books")
 
