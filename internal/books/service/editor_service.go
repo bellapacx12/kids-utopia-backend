@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/bellapacx/kids-utopia/internal/books/dto"
 	"github.com/bellapacx/kids-utopia/internal/books/repository"
@@ -62,4 +63,22 @@ func NewEditorService(
 		pageRepo: pageRepo,
 		storage:  storage,
 	}
+}
+func (s *EditorService) UpdateAccessType(
+	ctx context.Context,
+	bookID string,
+	accessType string,
+) error {
+
+	// optional: ensure book exists first
+	book, err := s.bookRepo.FindByID(ctx, bookID)
+	if err != nil {
+		return err
+	}
+
+	if book == nil {
+		return fmt.Errorf("book not found")
+	}
+
+	return s.UpdateAccessType(ctx, bookID, accessType)
 }

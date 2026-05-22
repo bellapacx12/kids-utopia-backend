@@ -84,3 +84,23 @@ func (r *bookRepository) ListBooks(
 
 	return books, total, nil
 }
+func (r *bookRepository) UpdateAccessType(
+	ctx context.Context,
+	bookID string,
+	accessType string,
+) error {
+
+	query := `
+		UPDATE books
+		SET access_type = $1,
+		    updated_at = NOW()
+		WHERE id = $2
+	`
+
+	_, err := database.DB.Exec(ctx, query, accessType, bookID)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
