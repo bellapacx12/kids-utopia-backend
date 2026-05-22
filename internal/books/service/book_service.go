@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"mime/multipart"
 	"time"
@@ -149,32 +150,46 @@ func (s *BookService) GetBookByIDs(
 	role string,
 ) (*model.Book, []model.BookPage, error) {
 
+	// =========================
+	// FETCH BOOK
+	// =========================
 	book, err := s.repo.GetBookByID(ctx, bookID)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	// =========================
-	// ACCESS CHECK (YOUR MODULE)
+	// ACCESS CHECK
 	// =========================
-	allowed, err := s.accessService.CanAccessBook(ctx, userID, book)
+	allowed, preview, err := s.accessService.CanAccessBook(ctx, userID, book)
 	if err != nil {
 		return nil, nil, err
-	}
-
-	if !allowed {
-		// return preview only
-		pages, _ := s.repo.GetBookPreview(ctx, bookID)
-		return book, pages, nil
 	}
 
 	// =========================
 	// FULL ACCESS
 	// =========================
-	pages, err := s.repo.GetBookPages(ctx, bookID)
-	if err != nil {
-		return nil, nil, err
+	if allowed {
+		pages, err := s.repo.GetBookPages(ctx, bookID)
+		if err != nil {
+			return nil, nil, err
+		}
+		return book, pages, nil
 	}
 
-	return book, pages, nil
+	// =========================
+	// PREVIEW ACCESS
+	// =========================
+	if preview {
+		pages, err := s.repo.GetBookPreview(ctx, bookID)
+		if err != nil {
+			return nil, nil, err
+		}
+		return book, pages, nil
+	}
+
+	// =========================
+	// NO ACCESS (SAFETY FALLBACK)
+	// =========================
+	return nil, nil, fmt.Errorf("access denied")
 }

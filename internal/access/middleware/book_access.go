@@ -1,7 +1,6 @@
 package middleware
 
 import (
-	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -87,36 +86,24 @@ func (m *Middleware) CheckBookAccess() gin.HandlerFunc {
 
 		// =========================
 		// SUBSCRIPTION CHECK
-        ok, err := m.accessService.CanAccessBook(
-	c,
-	userID,
-	book,
-)
+       allowed, preview, err := m.accessService.CanAccessBook(c, userID, book)
 
 if err != nil {
-	log.Printf(
-		"❌ CanAccessBook failed: userID=%s bookID=%s err=%v",
-		userID,
-		bookID,
-		err,
-	)
-
-	c.JSON(http.StatusInternalServerError, gin.H{
-		"error": "internal server error",
-	})
+	c.JSON(500, gin.H{"error": "internal server error"})
 	c.Abort()
 	return
 }
 
-if !ok {
-	c.JSON(http.StatusForbidden, gin.H{
-		"error": "premium subscription required",
-	})
+// 👉 ONLY block if NOT allowed AND NOT preview
+if !allowed && !preview {
+	c.JSON(403, gin.H{"error": "unauthorized"})
 	c.Abort()
 	return
 }
-            
 
-		c.Next()
+// attach preview flag for handler
+c.Set("is_preview", preview)
+
+c.Next()
 	}
 }
