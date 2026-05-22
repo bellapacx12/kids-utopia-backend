@@ -1,12 +1,14 @@
 package handler
 
 import (
+	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 
 	"github.com/bellapacx/kids-utopia/internal/subscriptions/dto"
 	"github.com/bellapacx/kids-utopia/internal/subscriptions/service"
+	"github.com/bellapacx/kids-utopia/pkg/contextkeys"
 )
 
 type Handler struct {
@@ -18,8 +20,8 @@ func New(s *service.Service) *Handler {
 }
 func (h *Handler) Start(c *gin.Context) {
 
-	userID := c.GetString("user_id")
-
+	userID := c.GetString(contextkeys.UserID)
+    log.Println(userID)
 	var req dto.CreateSubscriptionRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})

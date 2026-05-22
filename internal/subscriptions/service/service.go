@@ -2,9 +2,12 @@ package service
 
 import (
 	"context"
+	"errors"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx"
 
 	"github.com/bellapacx/kids-utopia/internal/subscriptions/dto"
 	"github.com/bellapacx/kids-utopia/internal/subscriptions/model"
@@ -45,10 +48,19 @@ func (s *Service) Create(ctx context.Context, userID string, req dto.CreateSubsc
 
 	return s.repo.Create(ctx, sub)
 }
-func (s *Service) HasActive(ctx context.Context, userID string) (bool, error) {
+func (s *Service) HasActive(
+	ctx context.Context,
+	userID string,
+) (bool, error) {
 
 	sub, err := s.repo.GetActiveByUser(ctx, userID)
+
 	if err != nil {
+		// treat any "no rows" variant safely
+		if errors.Is(err, pgx.ErrNoRows) ||
+			strings.Contains(err.Error(), "no rows in result set") {
+			return false, nil
+		}
 		return false, err
 	}
 

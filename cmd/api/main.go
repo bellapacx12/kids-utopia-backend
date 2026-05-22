@@ -216,7 +216,7 @@ bookroutes.RegisterEditorBookRoutes(
 	// =========================
 	// SUBSCRIPTIONS ROUTES
 	// =========================
-	subroutes.RegisterSubscriptionRoutes(r.Group("/api/v1"), subHandler)
+	subroutes.RegisterSubscriptionRoutes(r.Group("/api/v1/subscriptions"), subHandler)
 
 	// =========================
 	// EDITOR (ADMIN ONLY)
