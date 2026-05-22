@@ -29,7 +29,7 @@ func (r *bookRepository) ListBooks(
 ) ([]model.Book, int, error) {
 
 	query := `
-		SELECT id, title, author, cover_url, status, created_at
+		SELECT id, title, author, cover_url, status, created_at, access_type
 		FROM books
 		ORDER BY created_at DESC
 		LIMIT $1 OFFSET $2
@@ -53,6 +53,7 @@ func (r *bookRepository) ListBooks(
 			&b.CoverURL,
 			&b.Status,
 			&b.CreatedAt,
+			&b.AccessType,
 		)
 		if err != nil {
 			return nil, 0, err

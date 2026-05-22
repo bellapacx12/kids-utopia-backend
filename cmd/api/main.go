@@ -116,7 +116,7 @@ func main() {
 	// =========================
 	r := gin.Default()
 
-	
+	r.RedirectTrailingSlash = false
 // =========================
 // HEALTH CHECK
 // =========================

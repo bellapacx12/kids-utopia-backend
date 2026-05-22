@@ -11,5 +11,5 @@ type Book struct {
 	Status      string    `db:"status"` // draft, processing, ready, failed
 	CreatedAt   time.Time `db:"created_at"`
 	UpdatedAt   time.Time `db:"updated_at"`
-	AccessType  string  `db:"access_type"`
+	AccessType  string    `db:"access_type"`
 }
