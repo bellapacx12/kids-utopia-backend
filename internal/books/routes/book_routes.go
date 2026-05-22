@@ -6,19 +6,30 @@ import (
 	"github.com/bellapacx/kids-utopia/internal/books/handler"
 )
 
-func RegisterBookRoutes(
+// =========================
+// READER ROUTES
+// =========================
+
+func RegisterReaderRoutes(
+	books *gin.RouterGroup,
+	h *handler.BookHandler,
+) {
+
+	books.GET("/", h.ListBooks)
+
+	books.GET("/:id", h.GetBooks)
+}
+
+// =========================
+// EDITOR ROUTES
+// =========================
+
+func RegisterEditorBookRoutes(
 	books *gin.RouterGroup,
 	h *handler.BookHandler,
 ) {
 
 	books.POST("/", h.CreateBook)
 
-	books.GET("/:id", h.GetBooks)
-
 	books.POST("/upload", h.UploadBook)
-		// =========================
-		// GET BOOKS (LIST)
-		// =========================
-	books.GET("/", h.ListBooks)
-	
 }
