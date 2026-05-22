@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -94,12 +95,15 @@ func (m *Middleware) CheckBookAccess() gin.HandlerFunc {
 		)
 
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"error": "access error",
-			})
-			c.Abort()
-			return
-		}
+	log.Printf("❌ CanAccessBook failed: userID=%s bookID=%s err=%v",
+		userID, bookID, err)
+
+	c.JSON(http.StatusInternalServerError, gin.H{
+		"error": err.Error(),
+	})
+	c.Abort()
+	return
+}
 
 		if !ok {
 			c.JSON(http.StatusForbidden, gin.H{
