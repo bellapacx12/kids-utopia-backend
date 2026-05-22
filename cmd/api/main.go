@@ -117,6 +117,15 @@ func main() {
 	// =========================
 	r := gin.Default()
 
+	
+// =========================
+// HEALTH CHECK
+// =========================
+r.GET("/health", func(c *gin.Context) {
+	c.JSON(200, gin.H{
+		"status": "ok",
+	})
+})
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{"http://localhost:3000"},
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
