@@ -56,7 +56,7 @@ func (m *Middleware) CheckBookAccess() gin.HandlerFunc {
 		// =========================
 		// FETCH BOOK
 		// =========================
-		book, err := m.bookRepo.FindByID(c, bookID)
+		book, err := m.bookRepo.GetBookByID(c, bookID)
 		if err != nil {
 			c.JSON(http.StatusNotFound, gin.H{
 				"error": "book not found",
