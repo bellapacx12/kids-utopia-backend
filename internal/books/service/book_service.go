@@ -135,13 +135,9 @@ if err != nil {
 }
 func (s *BookService) ListBooks(
 	ctx context.Context,
-	page int,
-	limit int,
-) ([]model.Book, int, error) {
+) ([]model.Book, error) {
 
-	offset := (page - 1) * limit
-
-	return s.repo.ListBooks(ctx, limit, offset)
+	return s.repo.ListBooks(ctx)
 }
 func (s *BookService) GetBookByIDs(
 	ctx context.Context,
@@ -192,4 +188,59 @@ func (s *BookService) GetBookByIDs(
 	// NO ACCESS (SAFETY FALLBACK)
 	// =========================
 	return nil, nil, fmt.Errorf("access denied")
+}
+func (s *BookService) GetBook(
+	ctx context.Context,
+	bookID string,
+) (*model.Book, []model.BookPage, error) {
+
+	// =========================
+	// FETCH BOOK
+	// =========================
+	book, err := s.repo.GetBookByID(ctx, bookID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// =========================
+	// FETCH FULL PAGES
+	// =========================
+	pages, err := s.repo.GetBookPages(ctx, bookID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return book, pages, nil
+}
+
+func (s *BookService) GetBookPreview(
+	ctx context.Context,
+	bookID string,
+) (*model.Book, []model.BookPage, error) {
+
+	// =========================
+	// FETCH BOOK
+	// =========================
+	book, err := s.repo.GetBookByID(ctx, bookID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// =========================
+	// FETCH PREVIEW PAGES
+	// =========================
+	pages, err := s.repo.GetBookPreview(ctx, bookID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return book, pages, nil
+}
+
+func (s *BookService) GetBookMeta(
+	ctx context.Context,
+	bookID string,
+) (*model.Book, error) {
+
+	return s.repo.GetBookByID(ctx, bookID)
 }

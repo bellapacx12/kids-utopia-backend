@@ -13,7 +13,5 @@ func RegisterRoutes(
 
 	progress := r.Group("/progress")
 	progress.Use(auth)
-
-	progress.POST("/update", h.Update)
 	progress.GET("/:childId/:bookId", h.Get)
 }

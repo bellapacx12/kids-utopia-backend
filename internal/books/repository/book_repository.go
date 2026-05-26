@@ -11,7 +11,7 @@ type BookRepository interface {
 	Create(ctx context.Context, book *model.Book) error
 	FindByID(ctx context.Context, id string) (*model.Book, error)
 	UpdateStatus(ctx context.Context, id string, status string) error
-	ListBooks(ctx context.Context, limit int, offset int) ([]model.Book, int, error)
+	ListBooks(ctx context.Context,) ([]model.Book, error)
 
 	// ✅ ADD THIS
 	GetBookByID(ctx context.Context, id string) (*model.Book, error)
@@ -24,20 +24,17 @@ type BookRepository interface {
 }
 func (r *bookRepository) ListBooks(
 	ctx context.Context,
-	limit int,
-	offset int,
-) ([]model.Book, int, error) {
+) ([]model.Book, error) {
 
 	query := `
 		SELECT id, title, author, cover_url, status, created_at, access_type
 		FROM books
 		ORDER BY created_at DESC
-		LIMIT $1 OFFSET $2
 	`
 
-	rows, err := database.DB.Query(ctx, query, limit, offset)
+	rows, err := database.DB.Query(ctx, query)
 	if err != nil {
-		return nil, 0, err
+		return nil, err
 	}
 	defer rows.Close()
 
@@ -56,33 +53,17 @@ func (r *bookRepository) ListBooks(
 			&b.AccessType,
 		)
 		if err != nil {
-			return nil, 0, err
+			return nil, err
 		}
 
 		books = append(books, b)
 	}
 
 	if rows.Err() != nil {
-		return nil, 0, rows.Err()
+		return nil, rows.Err()
 	}
 
-	// =========================
-	// COUNT QUERY
-	// =========================
-
-	var total int
-
-	countQuery := `
-		SELECT COUNT(*)
-		FROM books
-	`
-
-	err = database.DB.QueryRow(ctx, countQuery).Scan(&total)
-	if err != nil {
-		return nil, 0, err
-	}
-
-	return books, total, nil
+	return books, nil
 }
 func (r *bookRepository) UpdateAccessType(
 	ctx context.Context,

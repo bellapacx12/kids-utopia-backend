@@ -5,6 +5,7 @@ import (
 
 	"github.com/bellapacx/kids-utopia/internal/children/dto"
 	"github.com/bellapacx/kids-utopia/internal/children/service"
+	"github.com/bellapacx/kids-utopia/pkg/contextkeys"
 )
 
 type ChildHandler struct {
@@ -16,7 +17,7 @@ func NewChildHandler(s *service.ChildService) *ChildHandler {
 }
 func (h *ChildHandler) Create(c *gin.Context) {
 
-	parentID := c.GetString("userID")
+	parentID := c.GetString(contextkeys.UserID)
 
 	var req dto.CreateChildRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -34,7 +35,7 @@ func (h *ChildHandler) Create(c *gin.Context) {
 }
 func (h *ChildHandler) MyChildren(c *gin.Context) {
 
-	parentID := c.GetString("userID")
+	parentID := c.GetString(contextkeys.UserID)
 
 	children, err := h.service.GetByParent(c.Request.Context(), parentID)
 	if err != nil {

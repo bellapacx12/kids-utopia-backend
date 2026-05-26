@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/bellapacx/kids-utopia/internal/progress/model"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -21,6 +22,7 @@ type repo struct {
 func NewProgressRepository(db *pgxpool.Pool) ProgressRepository {
 	return &repo{db: db}
 }
+
 func (r *repo) Create(ctx context.Context, p *model.BookProgress) error {
 	now := time.Now()
 
@@ -61,8 +63,13 @@ func (r *repo) Get(ctx context.Context, childID, bookID string) (*model.BookProg
 	)
 
 	if err != nil {
-		return nil, err
+
+	if err == pgx.ErrNoRows {
+		return nil, ErrNotFound
 	}
+
+	return nil, err
+}
 
 	return &p, nil
 }

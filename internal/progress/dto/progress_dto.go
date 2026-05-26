@@ -1,11 +1,11 @@
 package dto
 
 type UpdateProgressRequest struct {
-	ChildID string `json:"child_id"`
-	BookID  string `json:"book_id"`
-	Page    int    `json:"page"`
+	ChildID   string `json:"child_id"`
+	BookID    string `json:"book_id"`
+	Page      int    `json:"page"`
+	TotalPages int   `json:"total_pages"`
 }
-
 type ProgressResponse struct {
 	ChildID string `json:"child_id"`
 	BookID  string `json:"book_id"`

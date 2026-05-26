@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/bellapacx/kids-utopia/internal/progress/model"
@@ -15,46 +16,110 @@ type ProgressService struct {
 func NewProgressService(r repository.ProgressRepository) *ProgressService {
 	return &ProgressService{repo: r}
 }
+func (s *ProgressService) UpdateProgress(
+	ctx context.Context,
+	childID string,
+	bookID string,
+	page int,
+	totalPages int,
+) error {
 
-func (s *ProgressService) UpdateProgress(ctx context.Context, childID, bookID string, page int) error {
+	progress, err := s.repo.Get(
+		ctx,
+		childID,
+		bookID,
+	)
 
-	progress, err := s.repo.Get(ctx, childID, bookID)
+	// =========================
+	// CREATE NEW PROGRESS
+	// =========================
+
 	if err != nil {
-		// create new progress
-		p := &model.BookProgress{
-			ChildID:         childID,
-			BookID:          bookID,
-			CurrentPage:     page,
-			ProgressPercent: calculate(page),
-			Completed:       false,
-			LastReadAt:      time.Now(),
+
+		if errors.Is(err, repository.ErrNotFound) {
+
+			percent := calculateProgress(
+				page,
+				totalPages,
+			)
+
+			p := &model.BookProgress{
+				ChildID:         childID,
+				BookID:          bookID,
+				CurrentPage:     page,
+				ProgressPercent: percent,
+				Completed:       percent >= 100,
+				LastReadAt:      time.Now(),
+			}
+
+			return s.repo.Create(ctx, p)
 		}
 
-		if err := s.repo.Create(ctx, p); err != nil {
-			return err
-		}
-		return nil
+		return err
 	}
+	
+if progress.CurrentPage == page {
+	return nil
+}
+
 
 	progress.CurrentPage = page
-	progress.ProgressPercent = calculate(page)
-	progress.LastReadAt = time.Now()
 
-	if progress.ProgressPercent >= 100 {
-		progress.Completed = true
-	}
+	progress.ProgressPercent = calculateProgress(
+		page,
+		totalPages,
+	)
+
+	progress.Completed = progress.ProgressPercent >= 100
+
+	progress.LastReadAt = time.Now()
 
 	return s.repo.Update(ctx, progress)
 }
 
-func (s *ProgressService) GetProgress(ctx context.Context, childID, bookID string) (*model.BookProgress, error) {
-	return s.repo.Get(ctx, childID, bookID)
-}
+func calculateProgress(
+	page int,
+	totalPages int,
+) int {
 
-func calculate(page int) int {
-	// placeholder logic (you will improve later using total pages)
-	if page >= 10 {
+	if totalPages <= 0 {
+		return 0
+	}
+
+	percent := (page * 100) / totalPages
+
+	if percent > 100 {
 		return 100
 	}
-	return page * 10
+
+	return percent
+}
+func (s *ProgressService) GetProgress(
+	ctx context.Context,
+	childID, bookID string,
+) (*model.BookProgress, error) {
+	return s.repo.Get(ctx, childID, bookID)
+}
+func (s *ProgressService) CreateProgress(
+	ctx context.Context,
+	childID string,
+	bookID string,
+	page int,
+) (*model.BookProgress, error) {
+
+	p := &model.BookProgress{
+		ChildID:         childID,
+		BookID:          bookID,
+		CurrentPage:     page,
+		ProgressPercent: 0,
+		Completed:       false,
+		LastReadAt:      time.Now(),
+	}
+
+	err := s.repo.Create(ctx, p)
+	if err != nil {
+		return nil, err
+	}
+
+	return p, nil
 }

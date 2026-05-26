@@ -19,8 +19,14 @@ func NewProgressHandler(s *service.ProgressService) *ProgressHandler {
 func (h *ProgressHandler) Update(c *gin.Context) {
 
 	var req dto.UpdateProgressRequest
+
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(
+			http.StatusBadRequest,
+			gin.H{
+				"error": err.Error(),
+			},
+		)
 		return
 	}
 
@@ -29,14 +35,25 @@ func (h *ProgressHandler) Update(c *gin.Context) {
 		req.ChildID,
 		req.BookID,
 		req.Page,
+		req.TotalPages,
 	)
 
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(
+			http.StatusInternalServerError,
+			gin.H{
+				"error": err.Error(),
+			},
+		)
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"status": "updated"})
+	c.JSON(
+		http.StatusOK,
+		gin.H{
+			"status": "updated",
+		},
+	)
 }
 
 func (h *ProgressHandler) Get(c *gin.Context) {
