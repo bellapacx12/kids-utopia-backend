@@ -19,4 +19,5 @@ type SessionRepository interface {
 	Update(ctx context.Context, s *model.ReadingSession) error
 
 	EndSession(ctx context.Context, s *model.ReadingSession) error
+	GetTotalReadingTime(ctx context.Context, childID string) (int, error) 
 }

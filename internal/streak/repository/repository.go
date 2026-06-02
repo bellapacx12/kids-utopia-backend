@@ -3,7 +3,7 @@ package repository
 import (
 	"context"
 
-	"github.com/bellapacx/kids-utopia/internal/reader/streak/model"
+	"github.com/bellapacx/kids-utopia/internal/streak/model"
 )
 
 type StreakRepository interface {

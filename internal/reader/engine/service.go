@@ -2,20 +2,25 @@ package engine
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
+	"time"
 
 	accesssvc "github.com/bellapacx/kids-utopia/internal/access/service"
 	bookmodel "github.com/bellapacx/kids-utopia/internal/books/model"
 	booksvc "github.com/bellapacx/kids-utopia/internal/books/service"
+	"github.com/bellapacx/kids-utopia/internal/events"
 	"github.com/bellapacx/kids-utopia/internal/progress/repository"
 	progresssvc "github.com/bellapacx/kids-utopia/internal/progress/service"
 	"github.com/bellapacx/kids-utopia/internal/reader/constants"
-	"github.com/bellapacx/kids-utopia/internal/reader/events"
 	readermodel "github.com/bellapacx/kids-utopia/internal/reader/model"
-	streakservice "github.com/bellapacx/kids-utopia/internal/reader/streak/service"
 	sessionsvc "github.com/bellapacx/kids-utopia/internal/reader_session/service"
+	streakservice "github.com/bellapacx/kids-utopia/internal/streak/service"
+	"github.com/bellapacx/kids-utopia/pkg/sqs"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
 type Engine struct {
@@ -24,7 +29,7 @@ type Engine struct {
 	sessionService  *sessionsvc.Service
 	progressService *progresssvc.ProgressService
 	streakService   *streakservice.StreakService
-	eventBus        *events.Bus
+	sqsClient       *sqs.Client
 }
 
 func New(
@@ -33,7 +38,7 @@ func New(
 	session *sessionsvc.Service,
 	progress *progresssvc.ProgressService,
 	streakService *streakservice.StreakService,
-	eventBus *events.Bus,
+	sqsClient *sqs.Client,
 ) *Engine {
 
 	return &Engine{
@@ -42,7 +47,7 @@ func New(
 		sessionService:  session,
 		progressService: progress,
 		streakService:   streakService,
-		eventBus:        eventBus,
+		sqsClient:       sqsClient,
 	}
 }
 func (e *Engine) Open(
@@ -52,14 +57,19 @@ func (e *Engine) Open(
 	bookID string,
 ) (*readermodel.ReadingState, error) {
 
+	log.Printf("📖 OPEN: user=%s child=%s book=%s", userID, childID, bookID)
+
 	// =========================
 	// LOAD BOOK META
 	// =========================
 
 	book, err := e.bookService.GetBookMeta(ctx, bookID)
 	if err != nil {
+		log.Printf("❌ GetBookMeta failed book=%s err=%v", bookID, err)
 		return nil, err
 	}
+
+	log.Printf("📘 Book loaded: %s", bookID)
 
 	// =========================
 	// ACCESS CHECK
@@ -67,8 +77,11 @@ func (e *Engine) Open(
 
 	allowed, preview, err := e.accessService.CanAccessBook(ctx, userID, book)
 	if err != nil {
+		log.Printf("❌ Access check failed user=%s book=%s err=%v", userID, bookID, err)
 		return nil, err
 	}
+
+	log.Printf("🔐 Access result: allowed=%v preview=%v", allowed, preview)
 
 	locked := false
 
@@ -78,8 +91,11 @@ func (e *Engine) Open(
 
 		_, pages, err = e.bookService.GetBook(ctx, bookID)
 		if err != nil {
+			log.Printf("❌ GetBook failed book=%s err=%v", bookID, err)
 			return nil, err
 		}
+
+		log.Printf("📚 Full book loaded pages=%d", len(pages))
 
 	} else if preview {
 
@@ -87,10 +103,14 @@ func (e *Engine) Open(
 
 		_, pages, err = e.bookService.GetBookPreview(ctx, bookID)
 		if err != nil {
+			log.Printf("❌ GetBookPreview failed book=%s err=%v", bookID, err)
 			return nil, err
 		}
 
+		log.Printf("👀 Preview book loaded pages=%d", len(pages))
+
 	} else {
+		log.Printf("⛔ Access denied user=%s book=%s", userID, bookID)
 		return nil, fmt.Errorf("access denied")
 	}
 
@@ -100,20 +120,43 @@ func (e *Engine) Open(
 	// SESSION (GET OR CREATE)
 	// =========================
 
-    session, err := e.sessionService.GetOrCreateActiveSession(
-	ctx,
-	userID,
-	childID,
-	bookID,
-	0,
-)
+	session, err := e.sessionService.GetOrCreateActiveSession(
+		ctx,
+		userID,
+		childID,
+		bookID,
+		0,
+	)
 
-if err != nil {
-	return nil, err
-}
+	if err != nil {
+		log.Printf("❌ Session error user=%s child=%s book=%s err=%v",
+			userID, childID, bookID, err)
+		return nil, err
+	}
+
+	log.Printf("🟢 Session active: sessionID=%s", session.ID)
 
 	// =========================
-	// PROGRESS (GET OR CREATE)
+	// PUBLISH EVENT
+	// =========================
+
+	event := events.Event{
+		EventID:   uuid.NewString(),
+		Type:      events.SessionStarted,
+		SessionID: session.ID,
+		UserID:    userID,
+		ChildID:   childID,
+		BookID:    bookID,
+		Page:      0,
+		Timestamp: time.Now(),
+	}
+
+	e.publish(event)
+
+	log.Printf("📤 Event published: type=%s session=%s", event.Type, session.ID)
+
+	// =========================
+	// PROGRESS
 	// =========================
 
 	progress, err := e.progressService.GetProgress(ctx, childID, bookID)
@@ -121,6 +164,8 @@ if err != nil {
 	if err != nil {
 
 		if errors.Is(err, repository.ErrNotFound) {
+
+			log.Printf("📊 No progress found → creating child=%s book=%s", childID, bookID)
 
 			progress, err = e.progressService.CreateProgress(
 				ctx,
@@ -130,21 +175,25 @@ if err != nil {
 			)
 
 			if err != nil {
+				log.Printf("❌ CreateProgress failed err=%v", err)
 				return nil, err
 			}
-
 		} else {
+			log.Printf("❌ GetProgress failed err=%v", err)
 			return nil, err
 		}
 	}
 
-	currentPage := progress.CurrentPage
-	completed := progress.Completed
-	percent := progress.ProgressPercent
+	log.Printf("📊 Progress loaded page=%d percent=%d",
+		progress.CurrentPage,
+		progress.ProgressPercent,
+	)
 
 	// =========================
 	// RESPONSE
 	// =========================
+
+	log.Printf("✅ OPEN complete session=%s book=%s", session.ID, bookID)
 
 	return &readermodel.ReadingState{
 		SessionID: session.ID,
@@ -155,9 +204,9 @@ if err != nil {
 		},
 
 		Reader: readermodel.ReaderProgress{
-			CurrentPage:     currentPage,
-			Completed:       completed,
-			ProgressPercent: percent,
+			CurrentPage:     progress.CurrentPage,
+			Completed:       progress.Completed,
+			ProgressPercent: progress.ProgressPercent,
 		},
 
 		Access: readermodel.ReaderAccess{
@@ -249,11 +298,15 @@ func (e *Engine) Update(
 		return err
 	}
     
-	e.eventBus.Publish(events.Event{
-	Type:    events.ProgressUpdated,
-	ChildID: childID,
-	BookID:  bookID,
-	Page:    page,
+e.publish(events.Event{
+	EventID:   uuid.NewString(),
+	Type:      events.ProgressUpdated,
+	SessionID: session.ID,
+	UserID:    userID,
+	ChildID:   childID,
+	BookID:    bookID,
+	Page:      0,
+	Timestamp: time.Now(),
 })
 	// =========================
 	// TOTAL PAGES
@@ -413,7 +466,17 @@ func (e *Engine) Close(
 	if err != nil {
 		return err
 	}
-
+    
+	e.publish(events.Event{
+	EventID:   uuid.NewString(),
+	Type:      events.SessionEnded,
+	SessionID: session.ID,
+	UserID:    userID,
+	ChildID:   childID,
+	BookID:    bookID,
+	Page:      page,
+	Timestamp: time.Now(),
+})
 	// =========================
 	// END SESSION
 	// =========================
@@ -565,4 +628,13 @@ func (e *Engine) State(
 			Bookmarks: true,
 		},
 	}, nil
+}
+func (e *Engine) publish(event events.Event) {
+	b, err := json.Marshal(event)
+	log.Printf("📦 SQS PAYLOAD:\n%s", string(b))
+	if err != nil {
+		return
+	}
+
+	_ = e.sqsClient.Send(string(b))
 }

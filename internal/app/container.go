@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/bellapacx/kids-utopia/internal/reader/events"
 	"github.com/bellapacx/kids-utopia/pkg/config"
 	"github.com/bellapacx/kids-utopia/pkg/database"
 	"github.com/bellapacx/kids-utopia/pkg/logger"
@@ -20,6 +21,7 @@ type Container struct {
 	Storage *storage.S3Storage
 	DB      *pgxpool.Pool
 	Queue   *sqsClient.Client
+	ReaderEventsBus *events.Bus
 }
 
 func NewContainer() *Container {
@@ -62,11 +64,13 @@ func NewContainer() *Container {
 	if err != nil {
 		log.Fatal(err)
 	}
+	bus := events.NewBus(queue)
 
 	return &Container{
 		Config:  cfg,
 		DB:      database.DB,
 		Storage: storageClient,
 		Queue:   queue,
+		ReaderEventsBus: bus,
 	}
 }

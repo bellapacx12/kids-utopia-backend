@@ -12,9 +12,16 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
 
+	analyticsrepo "github.com/bellapacx/kids-utopia/internal/analytics/repository"
+	analyticssvc "github.com/bellapacx/kids-utopia/internal/analytics/service"
 	"github.com/bellapacx/kids-utopia/internal/books/events"
 	"github.com/bellapacx/kids-utopia/internal/books/repository"
 	"github.com/bellapacx/kids-utopia/internal/worker"
+
+	streakrepo "github.com/bellapacx/kids-utopia/internal/streak/repository"
+
+	// READER SESSION
+	sessionrepo "github.com/bellapacx/kids-utopia/internal/reader_session/repository"
 
 	"github.com/bellapacx/kids-utopia/pkg/config"
 	"github.com/bellapacx/kids-utopia/pkg/database"
@@ -69,7 +76,10 @@ func main() {
 	}
 
 	log.Println("🚀 Worker running (SQS consumer)")
-
+	sessionRepo := sessionrepo.New(database.DB)
+streakRepo := streakrepo.New(database.DB)
+	analyticsRepo := analyticsrepo.New(database.DB)
+analyticsService := analyticssvc.New(analyticsRepo, streakRepo, sessionRepo)
 	// =========================
 	// CONTEXT / SHUTDOWN
 	// =========================
@@ -91,7 +101,7 @@ func main() {
 	jobs := make(chan types.Message, 20)
 
 	for i := 0; i < workerCount; i++ {
-		go workerLoop(i, jobs, queue, st, bookPagesRepo)
+		go workerLoop(ctx,i, jobs, queue, st, bookPagesRepo, analyticsService)
 	}
 
 	// =========================
@@ -120,11 +130,13 @@ func main() {
 }
 
 func workerLoop(
+	ctx context.Context,
 	id int,
 	jobs <-chan types.Message,
 	queue *sqs.Client,
 	st storage.Storage,
 	repo repository.BookPagesRepository,
+	analyticsService *analyticssvc.Service,
 ) {
 	for msg := range jobs {
 
@@ -135,26 +147,84 @@ func workerLoop(
 				}
 			}()
 
-			var event events.BookUploadedEvent
+			// =========================
+			// STEP 1: decode base event (lightweight routing)
+			// =========================
+			var base struct {
+				Type string `json:"type"`
+			}
 
-			if err := json.Unmarshal([]byte(*msg.Body), &event); err != nil {
-				log.Println("invalid event:", err)
+			if err := json.Unmarshal([]byte(*msg.Body), &base); err != nil {
+				log.Println("❌ invalid base event:", err)
 				return
 			}
 
-			log.Printf("📘 worker %d processing book: %s", id, event.BookID)
+			log.Printf("📩 worker %d received event type: %s", id, base.Type)
 
-			if err := worker.ProcessBook(event, st, repo); err != nil {
-				log.Printf("❌ worker %d failed book %s: %v", id, event.BookID, err)
-				return
+			// =========================
+			// STEP 2: route by type
+			// =========================
+			switch base.Type {
+
+			// =========================
+			// BOOK UPLOADED (existing logic untouched)
+			// =========================
+			case "book.uploaded":
+
+				var event events.BookUploadedEvent
+
+				if err := json.Unmarshal([]byte(*msg.Body), &event); err != nil {
+					log.Println("❌ book event decode failed:", err)
+					return
+				}
+
+				log.Printf("📘 worker %d processing book: %s", id, event.BookID)
+
+				if err := worker.ProcessBook(event, st, repo); err != nil {
+					log.Printf("❌ worker %d failed book %s: %v", id, event.BookID, err)
+					return
+				}
+
+				log.Printf("✅ worker %d completed book: %s", id, event.BookID)
+
+			// =========================
+			// PROGRESS EVENT (placeholder)
+			// =========================
+			case "progress.updated":
+                
+				if err := analyticsService.ProcessMessage(ctx, *msg.Body); err != nil {
+		log.Printf("❌ analytics insert failed (progress.updated): %v", err)
+		return
+	}
+
+			// =========================
+			// SESSION EVENTS (placeholder)
+			// =========================
+			case "session.started":
+				
+	               if err := analyticsService.ProcessMessage(ctx, *msg.Body); err != nil {
+		log.Printf("❌ analytics insert failed: %v", err)
+	}
+
+			case "session.ended":
+			if err := analyticsService.ProcessMessage(ctx, *msg.Body); err != nil {
+		log.Printf("❌ analytics insert failed: %v", err)
+	}
+			// =========================
+			// UNKNOWN
+			// =========================
+			default:
+				log.Printf("⚠️ unknown event type: %s", base.Type)
 			}
 
+			// =========================
+			// DELETE MESSAGE ONLY AFTER SUCCESS ROUTE
+			// =========================
 			if err := queue.Delete(*msg.ReceiptHandle); err != nil {
-				log.Println("delete error:", err)
+				log.Println("❌ delete error:", err)
 				return
 			}
 
-			log.Printf("✅ worker %d completed book: %s", id, event.BookID)
 		}()
 	}
 }

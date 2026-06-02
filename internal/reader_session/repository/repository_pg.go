@@ -2,12 +2,13 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/bellapacx/kids-utopia/internal/reader_session/model"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -91,6 +92,9 @@ func (r *repo) GetByID(ctx context.Context, id string) (*model.ReadingSession, e
 	)
 
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
 		return nil, err
 	}
 
@@ -170,7 +174,6 @@ func (r *repo) EndSession(
 	query := `
 		UPDATE reading_sessions
 		SET end_page = $1,
-		    completed = true,
 		    ended_at = $2,
 		    duration_seconds = $3,
 		    updated_at = $4
@@ -188,4 +191,15 @@ func (r *repo) EndSession(
 	)
 
 	return err
+}
+func (r *repo) GetTotalReadingTime(ctx context.Context, childID string) (int, error) {
+	var total int
+
+	err := r.db.QueryRow(ctx, `
+		SELECT COALESCE(SUM(duration_seconds), 0)
+		FROM reading_sessions
+		WHERE child_id = $1
+	`, childID).Scan(&total)
+
+	return total, err
 }

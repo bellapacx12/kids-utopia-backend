@@ -9,6 +9,7 @@ import (
 )
 type Service struct {
 	repo repository.SessionRepository
+	
 }
 func New(r repository.SessionRepository) *Service {
 	return &Service{repo: r}

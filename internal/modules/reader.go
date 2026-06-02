@@ -1,8 +1,6 @@
 package modules
 
 import (
-	"context"
-
 	"github.com/gin-gonic/gin"
 
 	// BOOKS
@@ -22,15 +20,14 @@ import (
 
 	// READER ENGINE
 	readerengine "github.com/bellapacx/kids-utopia/internal/reader/engine"
-	"github.com/bellapacx/kids-utopia/internal/reader/events"
 	readerroutes "github.com/bellapacx/kids-utopia/internal/reader/routes"
 
 	// READER LIBRARY
 	readerlibrary "github.com/bellapacx/kids-utopia/internal/reader/library"
 	readerlibraryrepo "github.com/bellapacx/kids-utopia/internal/reader/library/repository"
 
-	streakrepo "github.com/bellapacx/kids-utopia/internal/reader/streak/repository"
-	streakservice "github.com/bellapacx/kids-utopia/internal/reader/streak/service"
+	streakrepo "github.com/bellapacx/kids-utopia/internal/streak/repository"
+	streakservice "github.com/bellapacx/kids-utopia/internal/streak/service"
 
 	// READER SESSION
 	sessionrepo "github.com/bellapacx/kids-utopia/internal/reader_session/repository"
@@ -88,6 +85,7 @@ func RegisterReader(
 	// =========================
 
 	sessionRepo := sessionrepo.New(container.DB)
+	
 
 	sessionService := sessionservice.New(sessionRepo)
 
@@ -95,15 +93,17 @@ func RegisterReader(
 	// STREAK (NEW)
 	// =========================
 
-	streakRepo := streakrepo.New(container.DB)
+streakRepo := streakrepo.New(container.DB)
+streakService := streakservice.New(streakRepo)
 
-	streakService := streakservice.New(streakRepo)
+
 
 	// =========================
 	// EVENT BUS (NEW)
 	// =========================
 
-	eventBus := events.NewBus()
+
+
 
 	// =========================
 	// ENGINE
@@ -115,17 +115,14 @@ func RegisterReader(
 		sessionService,
 		progressService,
 		streakService, // ✅ FIX 1
-		eventBus,      // ✅ FIX 2
+	    container.Queue,      // ✅ FIX 2
 	)
 
 	// =========================
 	// EVENT SUBSCRIPTIONS
 	// =========================
 
-	eventBus.Subscribe(events.ProgressUpdated, func(e events.Event) {
-		_ = streakService.UpdateStreak(context.Background(), e.ChildID)
-	})
-
+	
 	// =========================
 	// LIBRARY
 	// =========================
@@ -148,6 +145,7 @@ func RegisterReader(
 	api.Use(
 		middleware.AuthMiddleware(cfg.JWTSecret),
 	)
+
 
 	readerroutes.RegisterRoutes(api, engine)
 

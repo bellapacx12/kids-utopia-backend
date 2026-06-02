@@ -26,6 +26,7 @@ func RegisterReaderSession(
 
 	service := readerservice.New(
 		repo,
+	
 	)
 
 	handler := readerhandler.New(
