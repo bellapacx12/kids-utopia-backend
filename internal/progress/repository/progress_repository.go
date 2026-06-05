@@ -14,6 +14,7 @@ type ProgressRepository interface {
 	Get(ctx context.Context, childID, bookID string) (*model.BookProgress, error)
 	Update(ctx context.Context, p *model.BookProgress) error
 	ListByChild(ctx context.Context, childID string) ([]model.BookProgress, error)
+	Exists(ctx context.Context, childID, bookID string) (bool, error)
 }
 
 type repo struct {
@@ -146,4 +147,23 @@ func (r *repo) ListByChild(
 	}
 
 	return result, rows.Err()
+}
+func (r *repo) Exists(ctx context.Context, childID, bookID string) (bool, error) {
+	var exists bool
+
+	err := r.db.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1
+			FROM book_progress
+			WHERE child_id = $1 
+			AND book_id = $2
+			AND completed = true
+		)
+	`, childID, bookID).Scan(&exists)
+
+	if err != nil {
+		return false, err
+	}
+
+	return exists, nil
 }

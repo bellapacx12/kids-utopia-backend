@@ -169,25 +169,21 @@ func (r *repo) EndSession(
 
 	now := time.Now()
 
-	duration := int(now.Sub(s.StartedAt).Seconds())
-
 	query := `
 		UPDATE reading_sessions
 		SET end_page = $1,
 		    ended_at = $2,
-		    duration_seconds = $3,
-		    updated_at = $4
-		WHERE id = $5
+		    updated_at = $3
+		WHERE id = $4
 	`
 
 	_, err := r.db.Exec(
 		ctx,
 		query,
-		s.EndPage,
-		now,
-		duration,
-		now,
-		s.ID,
+		s.EndPage, // $1
+		now,       // $2 ended_at
+		now,       // $3 updated_at
+		s.ID,      // $4
 	)
 
 	return err

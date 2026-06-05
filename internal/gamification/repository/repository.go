@@ -15,7 +15,7 @@ import (
 
 type Repository interface {
 	GetXP(ctx context.Context, childID string) (*model.ChildXP, error)
-
+   
 	
 	UpsertXP(
 		ctx context.Context,
@@ -34,6 +34,7 @@ type Repository interface {
 	 GetBadges(
 	ctx context.Context,
 	childID string,
+	
 ) ([]model.MilestoneAward, error)
 }
 type Repo struct {

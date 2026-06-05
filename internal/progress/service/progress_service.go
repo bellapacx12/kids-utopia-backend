@@ -129,3 +129,9 @@ func (s *ProgressService) ListByChild(
 ) ([]model.BookProgress, error) {
 	return s.repo.ListByChild(ctx, childID)
 }
+func (s *ProgressService) Exists(
+	ctx context.Context,
+	childID, bookID string,
+) (bool, error) {
+	return s.repo.Exists(ctx, childID, bookID)
+}

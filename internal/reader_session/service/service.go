@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"log"
 	"time"
 
 	"github.com/bellapacx/kids-utopia/internal/reader_session/model"
@@ -61,14 +62,19 @@ func (s *Service) EndSession(
 	sessionID string,
 	page int,
 ) error {
-
+    log.Println("end called")
 	session, err := s.repo.GetByID(ctx, sessionID)
 	if err != nil {
 		return err
 	}
 
 	now := time.Now()
-
+    log.Printf(
+    "DEBUG session start=%v now=%v diff=%v",
+    session.StartedAt,
+    now,
+    now.Sub(session.StartedAt),
+)
 	session.EndPage = &page
 	session.EndedAt = &now
 	session.Completed = true

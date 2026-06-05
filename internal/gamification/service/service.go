@@ -63,12 +63,19 @@ func (s *Service) ProcessEvent(ctx context.Context, event rules.Event) error {
 	
 
 	state, err := s.repo.GetState(ctx, event.ChildID)
-	if err != nil {
-		log.Printf("❌ STATE LOAD FAILED child=%s err=%v", event.ChildID, err)
-		return err
-	}
+if err != nil {
+	log.Printf("❌ STATE LOAD FAILED child=%s err=%v", event.ChildID, err)
+	return err
+}
 
-	
+seen, err := s.progress.Exists(ctx, event.ChildID, event.BookID)
+if err != nil {
+	log.Printf("❌ PROGRESS CHECK FAILED child=%s book=%s err=%v",
+		event.ChildID, event.BookID, err)
+	return err
+}
+
+state.BookSeen = seen
 	
 
 	rewards, err := s.engine.Process(event, state)

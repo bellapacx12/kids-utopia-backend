@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"log"
 	"time"
 
 	"github.com/bellapacx/kids-utopia/internal/streak/model"
@@ -16,6 +17,7 @@ func New(repo repository.StreakRepository) *StreakService {
 	return &StreakService{repo: repo}
 }
 func (s *StreakService) UpdateStreak(ctx context.Context, childID string) error {
+	log.Printf("🔥 UpdateStreak called child=%s", childID)
 
 	now := time.Now().UTC()
 	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)

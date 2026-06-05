@@ -6,8 +6,8 @@ type FirstPageMilestone struct{}
 
 func (r FirstPageMilestone) Match(event rules.Event, state rules.State) bool {
 	return event.Type == "progress.updated" &&
-		event.Page > 0 &&
-		state.LastPage == 0
+		event.Page == 1 &&
+		!state.BookSeen
 }
 func (r FirstPageMilestone) Execute(event rules.Event, state rules.State) ([]rules.Reward, error) {
 

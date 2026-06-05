@@ -12,6 +12,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
 
+	analyticsmodel "github.com/bellapacx/kids-utopia/internal/analytics/model"
 	analyticsrepo "github.com/bellapacx/kids-utopia/internal/analytics/repository"
 	analyticssvc "github.com/bellapacx/kids-utopia/internal/analytics/service"
 	"github.com/bellapacx/kids-utopia/internal/books/events"
@@ -134,7 +135,7 @@ gamificationService := gamificationsvc.New(
 	jobs := make(chan types.Message, 20)
 
 	for i := 0; i < workerCount; i++ {
-		go workerLoop(ctx,i, jobs, queue, st, bookPagesRepo, analyticsService, gamificationService)
+		go workerLoop(ctx,i, jobs, queue, st, bookPagesRepo, analyticsService, gamificationService, streakservice)
 	}
 
 	// =========================
@@ -171,6 +172,7 @@ func workerLoop(
 	repo repository.BookPagesRepository,
 	analyticsService *analyticssvc.Service,
 	gamificationService *gamificationsvc.Service,
+	streakService *streaksvc.StreakService,
 ) {
 	for msg := range jobs {
 
@@ -275,7 +277,15 @@ if err != nil {
 			case "session.ended":
 			if err := analyticsService.ProcessMessage(ctx, *msg.Body); err != nil {
 		log.Printf("❌ analytics insert failed: %v", err)
-	}        
+	}       
+	 var event analyticsmodel.Event
+
+	if err := json.Unmarshal([]byte(*msg.Body), &event); err != nil {
+		return
+	}
+	       if err := streakService.UpdateStreak(ctx, event.ChildID); err != nil {
+			 log.Printf("streak insert failed; %v", err)
+		   }
 			// =========================
 			// UNKNOWN
 			// =========================

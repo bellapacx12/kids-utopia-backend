@@ -24,7 +24,7 @@ func (w *Service) ProcessMessage(ctx context.Context, msg string) error {
 	}
 
 	// ONLY SESSION END affects streak
-	if event.Type != "session_ended" {
+	if event.Type != "session.ended" {
 		return nil
 	}
 

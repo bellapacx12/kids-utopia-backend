@@ -19,6 +19,8 @@ package rules
 		Streak   int
 		Level    int
 		TotalPages int // REQUIRED for completion logic
+		BookSeen      bool
+	BookCompleted bool
 	}
 
 	// Reward is output of rules engine
