@@ -123,3 +123,9 @@ func (s *ProgressService) CreateProgress(
 
 	return p, nil
 }
+func (s *ProgressService) ListByChild(
+	ctx context.Context,
+	childID string,
+) ([]model.BookProgress, error) {
+	return s.repo.ListByChild(ctx, childID)
+}

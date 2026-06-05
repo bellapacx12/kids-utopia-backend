@@ -16,5 +16,7 @@ type Event struct {
 	SessionID string    `json:"session_id,omitempty"`
 
 	Page      int       `json:"page"`
+	PreviousPage int     `json:"previous_page"`
+	TotalPages int     `json:"total_pages"`
 	Timestamp time.Time `json:"timestamp"`
 }

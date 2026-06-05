@@ -16,13 +16,25 @@ import (
 	analyticssvc "github.com/bellapacx/kids-utopia/internal/analytics/service"
 	"github.com/bellapacx/kids-utopia/internal/books/events"
 	"github.com/bellapacx/kids-utopia/internal/books/repository"
+	gamificationrules "github.com/bellapacx/kids-utopia/internal/gamification/rules"
 	"github.com/bellapacx/kids-utopia/internal/worker"
 
 	streakrepo "github.com/bellapacx/kids-utopia/internal/streak/repository"
+	streaksvc "github.com/bellapacx/kids-utopia/internal/streak/service"
 
 	// READER SESSION
 	sessionrepo "github.com/bellapacx/kids-utopia/internal/reader_session/repository"
 
+	gamificationrepo "github.com/bellapacx/kids-utopia/internal/gamification/repository"
+	gamificationsvc "github.com/bellapacx/kids-utopia/internal/gamification/service"
+
+	milestones "github.com/bellapacx/kids-utopia/internal/gamification/milestones"
+	milestonerepo "github.com/bellapacx/kids-utopia/internal/gamification/milestones/repository"
+
+	appEvents "github.com/bellapacx/kids-utopia/internal/events"
+	themes "github.com/bellapacx/kids-utopia/internal/gamification/themes"
+	progressrepo "github.com/bellapacx/kids-utopia/internal/progress/repository"
+	progressservice "github.com/bellapacx/kids-utopia/internal/progress/service"
 	"github.com/bellapacx/kids-utopia/pkg/config"
 	"github.com/bellapacx/kids-utopia/pkg/database"
 	"github.com/bellapacx/kids-utopia/pkg/sqs"
@@ -78,8 +90,29 @@ func main() {
 	log.Println("🚀 Worker running (SQS consumer)")
 	sessionRepo := sessionrepo.New(database.DB)
 streakRepo := streakrepo.New(database.DB)
+streakservice := streaksvc.New(streakRepo)
 	analyticsRepo := analyticsrepo.New(database.DB)
 analyticsService := analyticssvc.New(analyticsRepo, streakRepo, sessionRepo)
+
+gamificationRepo := gamificationrepo.New(database.DB)
+
+milestoneRepo := milestonerepo.New(database.DB)
+
+milestoneService := milestones.New(milestoneRepo)
+
+progressRepo := progressrepo.NewProgressRepository(database.DB)
+progressService := progressservice.NewProgressService(progressRepo)
+
+themesRepo := themes.NewRepository(database.DB)
+themesService := themes.New(themesRepo)
+
+gamificationService := gamificationsvc.New(
+	gamificationRepo,
+	milestoneService,
+	streakservice,
+	progressService,
+	themesService,
+)
 	// =========================
 	// CONTEXT / SHUTDOWN
 	// =========================
@@ -101,7 +134,7 @@ analyticsService := analyticssvc.New(analyticsRepo, streakRepo, sessionRepo)
 	jobs := make(chan types.Message, 20)
 
 	for i := 0; i < workerCount; i++ {
-		go workerLoop(ctx,i, jobs, queue, st, bookPagesRepo, analyticsService)
+		go workerLoop(ctx,i, jobs, queue, st, bookPagesRepo, analyticsService, gamificationService)
 	}
 
 	// =========================
@@ -137,6 +170,7 @@ func workerLoop(
 	st storage.Storage,
 	repo repository.BookPagesRepository,
 	analyticsService *analyticssvc.Service,
+	gamificationService *gamificationsvc.Service,
 ) {
 	for msg := range jobs {
 
@@ -191,11 +225,43 @@ func workerLoop(
 			// PROGRESS EVENT (placeholder)
 			// =========================
 			case "progress.updated":
-                
+                log.Println("update event")
 				if err := analyticsService.ProcessMessage(ctx, *msg.Body); err != nil {
 		log.Printf("❌ analytics insert failed (progress.updated): %v", err)
 		return
 	}
+	          
+	          var event appEvents.Event
+
+	if err := json.Unmarshal([]byte(*msg.Body), &event); err != nil {
+		log.Printf("❌ progress decode failed: %v", err)
+		return
+	}
+
+err := gamificationService.ProcessEvent(
+	ctx,
+	gamificationrules.Event{
+		Type:      string(event.Type),
+		ChildID:   event.ChildID,
+		SessionID: event.SessionID,
+		BookID:    event.BookID,
+		Page:      event.Page,
+		PreviousPage: event.PreviousPage,
+		EventID:   event.EventID,
+		TotalPages : event.TotalPages,
+	},
+)
+
+if err != nil {
+	log.Printf("❌ gamification failed: %v", err)
+	return
+}
+
+	log.Printf(
+		"🎮 XP awarded child=%s xp=1 event=%s",
+		event.ChildID,
+		event.EventID,
+	)
 
 			// =========================
 			// SESSION EVENTS (placeholder)
@@ -209,7 +275,7 @@ func workerLoop(
 			case "session.ended":
 			if err := analyticsService.ProcessMessage(ctx, *msg.Body); err != nil {
 		log.Printf("❌ analytics insert failed: %v", err)
-	}
+	}        
 			// =========================
 			// UNKNOWN
 			// =========================

@@ -54,3 +54,35 @@ func (r *Repo) GetChildStats(ctx context.Context, childID string) (*model.Stats,
 
 	return &stats, nil
 }
+func (r *Repo) CountCompletedStories(ctx context.Context, childID string) (int, error) {
+	var count int
+
+	err := r.db.QueryRow(ctx, `
+		SELECT COUNT(*)
+		FROM book_progress
+		WHERE child_id = $1
+		  AND completed = true
+	`, childID).Scan(&count)
+
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+func (r *Repo) CountBadgesEarned(ctx context.Context, childID string) (int, error) {
+	var count int
+
+	err := r.db.QueryRow(ctx, `
+		SELECT COUNT(*)
+		FROM milestones_awarded
+		WHERE child_id = $1
+		  AND reward_type = 'badge'
+	`, childID).Scan(&count)
+
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}

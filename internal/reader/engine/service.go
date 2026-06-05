@@ -297,22 +297,14 @@ func (e *Engine) Update(
 	if err != nil {
 		return err
 	}
-    
-e.publish(events.Event{
-	EventID:   uuid.NewString(),
-	Type:      events.ProgressUpdated,
-	SessionID: session.ID,
-	UserID:    userID,
-	ChildID:   childID,
-	BookID:    bookID,
-	Page:      0,
-	Timestamp: time.Now(),
-})
-	// =========================
-	// TOTAL PAGES
-	// =========================
+    var prevPage int
 
-	var totalPages int
+if session.EndPage != nil {
+    prevPage = *session.EndPage
+} else {
+    prevPage = 0
+}
+var totalPages int
 
 	if allowed {
 
@@ -335,6 +327,23 @@ e.publish(events.Event{
 	if totalPages <= 0 {
 		totalPages = 1
 	}
+e.publish(events.Event{
+	EventID:   uuid.NewString(),
+	Type:      events.ProgressUpdated,
+	SessionID: session.ID,
+	UserID:    userID,
+	ChildID:   childID,
+	BookID:    bookID,
+	Page:      page,
+	PreviousPage: prevPage,
+	Timestamp: time.Now(),
+	TotalPages: totalPages,
+})
+	// =========================
+	// TOTAL PAGES
+	// =========================
+
+	
 
 	// =========================
 	// UPDATE PROGRESS
@@ -466,7 +475,7 @@ func (e *Engine) Close(
 	if err != nil {
 		return err
 	}
-    
+    log.Println("close")
 	e.publish(events.Event{
 	EventID:   uuid.NewString(),
 	Type:      events.SessionEnded,

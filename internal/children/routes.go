@@ -23,4 +23,5 @@ func RegisterRoutes(
 	children.GET("/", h.MyChildren)
 	children.GET("/:childId/streak", streak.Get)
 children.GET("/:childId/analytics", analytics.GetAnalytics)
+children.GET("/:childId/gamification", h.GetChild)
 }

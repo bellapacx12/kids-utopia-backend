@@ -18,6 +18,17 @@ import (
 	analyticsrepo "github.com/bellapacx/kids-utopia/internal/analytics/repository"
 	analyticsservice "github.com/bellapacx/kids-utopia/internal/analytics/service"
 
+	gamificationrepo "github.com/bellapacx/kids-utopia/internal/gamification/repository"
+	gamificationsvc "github.com/bellapacx/kids-utopia/internal/gamification/service"
+
+	progressrepo "github.com/bellapacx/kids-utopia/internal/progress/repository"
+	progressservice "github.com/bellapacx/kids-utopia/internal/progress/service"
+
+	milestones "github.com/bellapacx/kids-utopia/internal/gamification/milestones"
+	milestonerepo "github.com/bellapacx/kids-utopia/internal/gamification/milestones/repository"
+
+	themes "github.com/bellapacx/kids-utopia/internal/gamification/themes"
+
 	// READER SESSION
 	sessionrepo "github.com/bellapacx/kids-utopia/internal/reader_session/repository"
 
@@ -35,11 +46,31 @@ func RegisterChildren(
 	childRepo := childrenRepo.NewChildRepository(
 		database.DB,
 	)
+	gamificationRepo := gamificationrepo.New(container.DB)
+
+streakRepo := streakrepo.New(container.DB)
+streakService := streakservice.New(streakRepo)
+
+milestoneRepo := milestonerepo.New(database.DB)
+
+milestoneService := milestones.New(milestoneRepo)
+progressRepo := progressrepo.NewProgressRepository(database.DB)
+progressService := progressservice.NewProgressService(progressRepo)
+themesRepo := themes.NewRepository(database.DB)
+themesService := themes.New(themesRepo)
+gamificationService := gamificationsvc.New(
+	gamificationRepo,
+	milestoneService,
+	streakService,
+	progressService,
+	themesService,
+)
 
 	childService := childrenService.NewChildService(
 		childRepo,
+		gamificationService,
 	)
-
+    
 	childHandler := childrenHandler.NewChildHandler(
 		childService,
 	)
@@ -47,8 +78,6 @@ func RegisterChildren(
 	sessionRepo := sessionrepo.New(container.DB)
 	
 
-streakRepo := streakrepo.New(container.DB)
-streakService := streakservice.New(streakRepo)
 
 streakHandler := streakhandler.New(streakService) // ✅ correct
 

@@ -13,6 +13,7 @@ type ProgressRepository interface {
 	Create(ctx context.Context, p *model.BookProgress) error
 	Get(ctx context.Context, childID, bookID string) (*model.BookProgress, error)
 	Update(ctx context.Context, p *model.BookProgress) error
+	ListByChild(ctx context.Context, childID string) ([]model.BookProgress, error)
 }
 
 type repo struct {
@@ -95,4 +96,54 @@ func (r *repo) Update(ctx context.Context, p *model.BookProgress) error {
 	)
 
 	return err
+}
+func (r *repo) ListByChild(
+	ctx context.Context,
+	childID string,
+) ([]model.BookProgress, error) {
+
+	rows, err := r.db.Query(ctx, `
+		SELECT
+			id,
+			child_id,
+			book_id,
+			current_page,
+			progress_percent,
+			completed,
+			last_read_at,
+			created_at,
+			updated_at
+		FROM book_progress
+		WHERE child_id = $1
+	`, childID)
+
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []model.BookProgress
+
+	for rows.Next() {
+		var p model.BookProgress
+
+		err := rows.Scan(
+			&p.ID,
+			&p.ChildID,
+			&p.BookID,
+			&p.CurrentPage,
+			&p.ProgressPercent,
+			&p.Completed,
+			&p.LastReadAt,
+			&p.CreatedAt,
+			&p.UpdatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		result = append(result, p)
+	}
+
+	return result, rows.Err()
 }

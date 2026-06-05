@@ -87,3 +87,80 @@ if err != nil {
 
 	return result, nil
 }
+func (s *Service) GetAnalyticss(ctx context.Context, childID string) (map[string]any, error) {
+
+	// =========================
+	// 1. BASIC STATS
+	// =========================
+	stats, err := s.repo.GetChildStats(ctx, childID)
+	if err != nil {
+		return nil, err
+	}
+
+	// =========================
+	// 2. STREAK
+	// =========================
+	streak, _ := s.streakRepo.Get(ctx, childID)
+
+	currentStreak := 0
+	longestStreak := 0
+
+	if streak != nil {
+		currentStreak = streak.CurrentStreak
+		longestStreak = streak.LongestStreak
+	}
+
+	// =========================
+	// 3. SESSION METRICS
+	// =========================
+	totalTime, err := s.sessionRepo.GetTotalReadingTime(ctx, childID)
+	if err != nil {
+		return nil, err
+	}
+
+	totalSessions, err := s.sessionRepo.CountSessions(ctx, childID)
+	if err != nil {
+		return nil, err
+	}
+
+	avgSession := 0
+	if totalSessions > 0 {
+		avgSession = totalTime / totalSessions
+	}
+
+	// =========================
+	// 4. STORIES COMPLETED
+	// =========================
+	storiesCompleted, err := s.repo.CountCompletedStories(ctx, childID)
+	if err != nil {
+		return nil, err
+	}
+
+	// =========================
+	// 5. BADGES EARNED
+	// =========================
+	badgesEarned, err := s.repo.CountBadgesEarned(ctx, childID)
+	if err != nil {
+		return nil, err
+	}
+
+	// =========================
+	// RESULT
+	// =========================
+	return map[string]any{
+		"child_id": childID,
+
+		"total_sessions": stats.TotalSessions,
+		"total_pages":    stats.TotalPages,
+
+		"stories_completed": storiesCompleted,
+
+		"total_reading_time_seconds": totalTime,
+		"average_session_seconds":    avgSession,
+
+		"badges_earned": badgesEarned,
+
+		"current_streak": currentStreak,
+		"longest_streak": longestStreak,
+	}, nil
+}

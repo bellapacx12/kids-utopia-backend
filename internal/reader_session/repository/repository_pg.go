@@ -114,11 +114,11 @@ func (r *repo) GetActiveSession(
 		       completed
 		FROM reading_sessions
 		WHERE user_id = $1
-		  AND child_id = $2
-		  AND book_id = $3
-		  AND ended_at IS NULL
-		ORDER BY started_at DESC
-		LIMIT 1
+        AND child_id = $2
+        AND book_id = $3
+        AND completed = false
+        ORDER BY started_at DESC
+        LIMIT 1
 	`, userID, childID, bookID).Scan(
 		&s.ID,
 		&s.UserID,
@@ -202,4 +202,19 @@ func (r *repo) GetTotalReadingTime(ctx context.Context, childID string) (int, er
 	`, childID).Scan(&total)
 
 	return total, err
+}
+func (r *repo) CountSessions(ctx context.Context, childID string) (int, error) {
+	var count int
+
+	err := r.db.QueryRow(ctx, `
+		SELECT COUNT(*)
+		FROM reading_sessions
+		WHERE child_id = $1
+	`, childID).Scan(&count)
+
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
 }

@@ -19,7 +19,7 @@ func (h *Handler) GetAnalytics(c *gin.Context) {
 
 	childID := c.Param("childId")
 
-	data, err := h.svc.GetAnalytics(c.Request.Context(), childID)
+	data, err := h.svc.GetAnalyticss(c.Request.Context(), childID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": err.Error(),
