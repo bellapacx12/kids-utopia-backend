@@ -489,7 +489,7 @@ func (e *Engine) Close(
 	// =========================
 	// END SESSION
 	// =========================
-
+    
 	return e.sessionService.EndSession(
 		ctx,
 		session.ID,

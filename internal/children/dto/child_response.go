@@ -33,7 +33,7 @@ type MilestoneDTO struct {
 
 	Current int  `json:"current"`
 	Target  int  `json:"target"`
-
+    ProgressPercent int    `json:"progress_percent"`
 	Awarded bool `json:"awarded"`
 }
 type ThemeDTO struct {

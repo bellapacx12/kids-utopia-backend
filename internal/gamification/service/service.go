@@ -39,6 +39,7 @@ type Milestone struct {
 	Description string
 	Current     int
 	Target      int
+	ProgressPercent int    `json:"progress_percent"`
 	Awarded     bool
 }
 type ThemeDTO struct {
@@ -275,6 +276,7 @@ func (s *Service) GetSnapshot(ctx context.Context, childID string) (*Snapshot, e
 			Description: m.Description,
 			Current:     current,
 			Target:      m.Target,
+			ProgressPercent: progressPercent(current, m.Target),
 			Awarded:     awardedMilestones["first_page"],
 		})
 	}
@@ -295,6 +297,7 @@ func (s *Service) GetSnapshot(ctx context.Context, childID string) (*Snapshot, e
 			Description: m.Description,
 			Current:     completed,
 			Target:      m.Target,
+			ProgressPercent: progressPercent(completed, m.Target),
 			Awarded:     awardedMilestones["book_completed"],
 		})
 	}
@@ -308,6 +311,7 @@ func (s *Service) GetSnapshot(ctx context.Context, childID string) (*Snapshot, e
 			Description: m.Description,
 			Current:     streak,
 			Target:      m.Target,
+			ProgressPercent: progressPercent(streak, m.Target),
 			Awarded:     awardedMilestones["streak_7"],
 		})
 	}
@@ -354,4 +358,17 @@ func calculateLevel(xp int) int {
 	default:
 		return 4
 	}
+}
+func progressPercent(current, target int) int {
+	if target <= 0 {
+		return 0
+	}
+
+	p := (current * 100) / target
+
+	if p > 100 {
+		return 100
+	}
+
+	return p
 }

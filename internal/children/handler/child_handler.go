@@ -91,7 +91,7 @@ func mapBadges(in []badges.Badge) []dto.BadgeDTO {
 			Title:       b.Title,
 			Description: b.Description,
 			Icon:        b.Icon,
-			Awarded:     true,
+			Awarded:     b.Awarded,
 		})
 	}
 
