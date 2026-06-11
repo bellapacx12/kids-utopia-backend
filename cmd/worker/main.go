@@ -207,7 +207,7 @@ func workerLoop(
 			// =========================
 			case "book.uploaded":
 
-				var event events.BookUploadedEvent
+				var event events.BookVariantUploaded
 
 				if err := json.Unmarshal([]byte(*msg.Body), &event); err != nil {
 					log.Println("❌ book event decode failed:", err)
@@ -218,6 +218,8 @@ func workerLoop(
 
 				if err := worker.ProcessBook(event, st, repo); err != nil {
 					log.Printf("❌ worker %d failed book %s: %v", id, event.BookID, err)
+					log.Println("Message ID:", *msg.MessageId)
+					_ = queue.Delete(*msg.ReceiptHandle) // DELETE EVEN ON ERROR
 					return
 				}
 

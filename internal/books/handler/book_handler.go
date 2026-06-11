@@ -1,8 +1,10 @@
 package handler
 
 import (
+	"context"
 	"log"
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 
@@ -161,5 +163,257 @@ func (h *BookHandler) GetBooks(c *gin.Context) {
 			"book":  book,
 			"pages": pages,
 		},
+	})
+}
+func (h *BookHandler) UploadBooks(c *gin.Context) {
+
+	log.Println("📥 [UploadBook] endpoint hit")
+
+	title := c.PostForm("title")
+	author := c.PostForm("author")
+	description := c.PostForm("description")
+
+	accessType := c.PostForm("access_type")
+	language := c.PostForm("language")
+	category := c.PostForm("category")
+
+	ageMin, _ := strconv.Atoi(c.PostForm("age_min"))
+	ageMax, _ := strconv.Atoi(c.PostForm("age_max"))
+    
+	log.Println("RAW FORM VALUES:")
+log.Println("age_min =", c.PostForm("age_min"))
+log.Println("age_max =", c.PostForm("age_max"))
+log.Println("language =", c.PostForm("language"))
+log.Println("category =", c.PostForm("category"))
+log.Println("access_type =", c.PostForm("access_type"))
+	if title == "" || author == "" {
+		c.JSON(400, gin.H{
+			"error": "title and author required",
+		})
+		return
+	}
+
+	file, err := c.FormFile("file")
+	if err != nil {
+		log.Println("❌ [UploadBook] file missing:", err)
+
+		c.JSON(400, gin.H{
+			"error": "file required",
+		})
+		return
+	}
+
+	src, err := file.Open()
+	if err != nil {
+		log.Println("❌ [UploadBook] cannot open file:", err)
+
+		c.JSON(500, gin.H{
+			"error": "cannot open file",
+		})
+		return
+	}
+	defer src.Close()
+
+	log.Println("⬆️ [UploadBook] uploading to storage...")
+
+	fileURL, err := h.service.UploadToStorage(
+		c.Request.Context(),
+		src,
+		file.Filename,
+	)
+	if err != nil {
+		log.Println("❌ [UploadBook] upload failed:", err)
+
+		c.JSON(500, gin.H{
+			"error": "upload failed",
+		})
+		return
+	}
+
+	log.Println("✅ [UploadBook] upload success:", fileURL)
+
+	req := dto.CreateUploadedBookRequest{
+		Title:       title,
+		Description: description,
+		Author:      author,
+
+		AccessType: accessType,
+
+		AgeMin: ageMin,
+		AgeMax: ageMax,
+
+		Language: language,
+		Category: category,
+	}
+
+	book, err := h.service.CreateUploadedBooks(
+		context.Background(),
+		req,
+		fileURL,
+	)
+	if err != nil {
+		log.Println("❌ [UploadBook] create book failed:", err)
+
+		c.JSON(500, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	log.Println("🎉 [UploadBook] book created:", book.ID)
+
+	c.JSON(200, gin.H{
+		"data": book,
+	})
+}
+func (h *BookHandler) UploadFirstVariant(c *gin.Context) {
+	log.Println("📥 UploadFirstVariant called")
+
+	ctx := c.Request.Context()
+
+	// =========================
+	// FORM INPUTS
+	// =========================
+	bookID := c.PostForm("book_id")
+
+	title := c.PostForm("title")
+	author := c.PostForm("author")
+	description := c.PostForm("description")
+
+	language := c.PostForm("language")
+	accessType := c.PostForm("access_type")
+	category := c.PostForm("category")
+
+	ageMin, _ := strconv.Atoi(c.PostForm("age_min"))
+	ageMax, _ := strconv.Atoi(c.PostForm("age_max"))
+
+	// =========================
+	// VALIDATION
+	// =========================
+	if title == "" || author == "" || language == "" {
+		c.JSON(400, gin.H{
+			"error": "title, author, language required",
+		})
+		return
+	}
+
+	// =========================
+	// FILE
+	// =========================
+	file, err := c.FormFile("file")
+	if err != nil {
+		c.JSON(400, gin.H{"error": "file required"})
+		return
+	}
+
+	src, err := file.Open()
+	if err != nil {
+		c.JSON(500, gin.H{"error": "cannot open file"})
+		return
+	}
+	defer src.Close()
+
+	// =========================
+	// UPLOAD FILE
+	// =========================
+	fileURL, err := h.service.UploadToStorage(ctx, src, file.Filename)
+	if err != nil {
+		c.JSON(500, gin.H{"error": "upload failed"})
+		return
+	}
+
+	// =========================
+	// SERVICE CALL
+	// =========================
+	req := dto.CreateFirstVariantRequest{
+		BookID:      bookID,
+		Title:       title,
+		Author:      author,
+		Description: description,
+
+		Language:    language,
+		AccessType:  accessType,
+		Category:    category,
+
+		AgeMin:      ageMin,
+		AgeMax:      ageMax,
+	}
+
+	result, err := h.service.CreateBookWithFirstVariant(ctx, req, fileURL)
+	if err != nil {
+		log.Println("❌ create failed:", err)
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+
+	// =========================
+	// RESPONSE
+	// =========================
+	c.JSON(200, gin.H{
+		"data": gin.H{
+			"book_id":    result.Book.ID,
+			"variant_id": result.Variant.ID,
+			"status":     result.Variant.Status,
+			"progress":   result.Variant.Progress,
+		},
+	})
+}
+func (h *BookHandler) UploadVariant(c *gin.Context) {
+	ctx := c.Request.Context()
+
+	bookID := c.Param("id")
+	language := c.PostForm("language")
+	title := c.PostForm("title")
+
+	file, err := c.FormFile("file")
+	if err != nil {
+		c.JSON(400, gin.H{"error": "file required"})
+		return
+	}
+
+	src, _ := file.Open()
+	defer src.Close()
+
+	fileURL, err := h.service.UploadToStorage(ctx, src, file.Filename)
+	if err != nil {
+		c.JSON(500, gin.H{"error": "upload failed"})
+		return
+	}
+
+	variant, err := h.service.CreateBookVariant(ctx, dto.CreateVariantRequest{
+		BookID:   bookID,
+		Language: language,
+		Title:    title,
+		FileURL:  fileURL,
+	})
+	if err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(200, gin.H{
+		"data": gin.H{
+			"variant_id": variant.ID,
+			"book_id":    variant.BookID,
+			"language":   variant.Language,
+			"status":     variant.Status,
+			"progress":   variant.Progress,
+		},
+	})
+}
+func (h *BookHandler) ListBook(c *gin.Context) {
+
+	books, err := h.service.ListBooksWithVariants(
+		c.Request.Context(),
+	)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"data": books,
 	})
 }

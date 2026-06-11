@@ -93,12 +93,28 @@ func RegisterBooks(
 	// =========================
 	editorBooks := r.Group("/api/v1/books")
 
+	editorService := bookservice.NewEditorService(
+	bookRepo,
+	 bookrepo.NewBookPagesRepository(container.DB),
+	container.Storage,
+)
+
+	  
+    editorHandler := bookhandler.NewEditorHandler(
+	editorService,
+	// add other deps if needed
+)
+	
+
 	editorBooks.Use(
 		middleware.AuthMiddleware(cfg.JWTSecret),
 	)
 
 	editorBooks.Use(
 		middleware.RequireRoles("editor", "admin"),
+	)
+	bookroutes.RegisterEditorRoutes(editorBooks,
+       editorHandler,
 	)
 
 	bookroutes.RegisterEditorBookRoutes(

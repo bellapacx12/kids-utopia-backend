@@ -16,15 +16,15 @@ type EditorService struct {
 }
 func (s *EditorService) GetEditor(
 	ctx context.Context,
-	bookID string,
+	variantID string,
 ) (*dto.EditorResponse, error) {
 
-	book, err := s.bookRepo.FindByID(ctx, bookID)
+	book, err := s.bookRepo.FindVariantByID(ctx, variantID)
 	if err != nil {
 		return nil, err
 	}
 
-	pages, err := s.pageRepo.GetPages(ctx, bookID)
+	pages, err := s.pageRepo.GetPagesByVariantID(ctx, variantID)
 	if err != nil {
 		return nil, err
 	}
@@ -41,16 +41,17 @@ func (s *EditorService) GetEditor(
 	return &dto.EditorResponse{
 		BookID: book.ID,
 		Status: book.Status,
+		Progress: book.Progress,
 		Pages:  pages,
 	}, nil
 }
 func (s *EditorService) SaveEditor(
 	ctx context.Context,
-	bookID string,
+	variantID string,
 	req dto.SaveEditorRequest,
 ) error {
 
-	return s.pageRepo.SavePages(ctx, bookID, req.Pages)
+	return s.pageRepo.SavePagesByVariant(ctx, variantID, req.Pages)
 }
 func NewEditorService(
 	bookRepo repository.BookRepository,

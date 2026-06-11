@@ -8,7 +8,7 @@ type Child struct {
 
 	Name      string
 	AvatarURL *string
-	Age       *int
+	Age       int
 	Language  string
   
 	CreatedAt time.Time

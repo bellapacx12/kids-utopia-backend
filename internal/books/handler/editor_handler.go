@@ -19,9 +19,8 @@ func NewEditorHandler(s *service.EditorService) *EditorHandler {
 }
 func (h *EditorHandler) GetEditor(c *gin.Context) {
 
-	bookID := c.Param("id")
-
-	res, err := h.service.GetEditor(c.Request.Context(), bookID)
+	variantID := c.Param("id")
+	res, err := h.service.GetEditor(c.Request.Context(), variantID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -31,7 +30,7 @@ func (h *EditorHandler) GetEditor(c *gin.Context) {
 }
 func (h *EditorHandler) SaveEditor(c *gin.Context) {
 
-	bookID := c.Param("id")
+	variantID := c.Param("id")
 
 	var req dto.SaveEditorRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -39,7 +38,7 @@ func (h *EditorHandler) SaveEditor(c *gin.Context) {
 		return
 	}
 
-	err := h.service.SaveEditor(c.Request.Context(), bookID, req)
+	err := h.service.SaveEditor(c.Request.Context(), variantID, req)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

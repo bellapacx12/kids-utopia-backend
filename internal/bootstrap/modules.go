@@ -43,5 +43,12 @@ modules.RegisterReader(
 	a.Router,
 	a.Container,
 ) 
-   
+   modules.RegisterBookmarks(
+	a.Router,
+	a.Container,
+   )
+   modules.RegisterRecommendation(
+	a.Router,
+	a.Container,
+   )
 }

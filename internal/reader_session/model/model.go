@@ -12,7 +12,7 @@ type ReadingSession struct {
 	StartedAt time.Time  `db:"started_at" json:"started_at"`
 	EndedAt   *time.Time `db:"ended_at" json:"ended_at"`
 
-	DurationSeconds int `db:"duration_seconds" json:"duration_seconds"`
+	DurationSeconds *int `db:"duration_seconds" json:"duration_seconds"`
 
 	StartPage int `db:"start_page" json:"start_page"`
 	EndPage   *int `db:"end_page" json:"end_page"`

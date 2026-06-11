@@ -38,11 +38,10 @@ func (r *repo) Create(ctx context.Context, s *model.ReadingSession) error {
 			start_page,
 			end_page,
 			completed,
-			duration_seconds,
 			created_at,
 			updated_at
 		)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
 	`
 
 	_, err := r.db.Exec(
@@ -56,7 +55,6 @@ func (r *repo) Create(ctx context.Context, s *model.ReadingSession) error {
 		s.StartPage,
 		s.EndPage,
 		s.Completed,
-		s.DurationSeconds,
 		s.CreatedAt,
 		s.UpdatedAt,
 	)

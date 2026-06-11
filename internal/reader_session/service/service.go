@@ -79,7 +79,7 @@ func (s *Service) EndSession(
 	session.EndedAt = &now
 	session.Completed = true
 	session.UpdatedAt = now
-	session.DurationSeconds = int(now.Sub(session.StartedAt).Seconds())
+
 
 	return s.repo.EndSession(ctx, session)
 }

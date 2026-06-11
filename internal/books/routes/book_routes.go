@@ -18,7 +18,7 @@ func RegisterReaderRoutes(
 ) {
 
 	// LIST BOOKS
-	books.GET("/", h.ListBooks)
+	books.GET("/", h.ListBook)
 
 	// SINGLE BOOK ACCESS CHECK
 	books.GET(
@@ -39,5 +39,7 @@ func RegisterEditorBookRoutes(
 
 	books.POST("/", h.CreateBook)
 
-	books.POST("/upload", h.UploadBook)
+	books.POST("/upload", h.UploadFirstVariant)
+	books.POST("/:id/variants", h.UploadVariant)
+
 }

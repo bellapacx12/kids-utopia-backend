@@ -7,7 +7,7 @@ import (
 
 func RegisterEditorRoutes(rg *gin.RouterGroup, h *handler.EditorHandler) {
 
-	rg.GET("/books/:id/editor", h.GetEditor)
-	rg.POST("/books/:id/editor/save", h.SaveEditor)
-	rg.PUT("/books/:id/editor/access-type", h.UpdateAccessType)
+	rg.GET("/:id/editor", h.GetEditor)
+	rg.POST("/:id/editor/save", h.SaveEditor)
+	rg.PUT("/:id/editor/access-type", h.UpdateAccessType)
 }

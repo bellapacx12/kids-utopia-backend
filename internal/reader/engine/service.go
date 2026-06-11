@@ -9,6 +9,7 @@ import (
 	"time"
 
 	accesssvc "github.com/bellapacx/kids-utopia/internal/access/service"
+	bookdto "github.com/bellapacx/kids-utopia/internal/books/dto"
 	bookmodel "github.com/bellapacx/kids-utopia/internal/books/model"
 	booksvc "github.com/bellapacx/kids-utopia/internal/books/service"
 	"github.com/bellapacx/kids-utopia/internal/events"
@@ -85,36 +86,39 @@ func (e *Engine) Open(
 
 	locked := false
 
-	var pages []bookmodel.BookPage
+var variants []bookdto.ReaderVariant
 
 	if allowed {
 
-		_, pages, err = e.bookService.GetBook(ctx, bookID)
+		variants, err = e.bookService.GetVariantsWithPages(ctx, bookID)
 		if err != nil {
-			log.Printf("❌ GetBook failed book=%s err=%v", bookID, err)
+			log.Printf("❌ GetBookVariant failed book=%s err=%v", bookID, err)
 			return nil, err
 		}
 
-		log.Printf("📚 Full book loaded pages=%d", len(pages))
+		log.Printf("📚 Full book loaded pages=%d", len(variants))
 
 	} else if preview {
 
 		locked = true
 
-		_, pages, err = e.bookService.GetBookPreview(ctx, bookID)
+		variants, err = e.bookService.GetVariantsWithPreview(ctx, bookID, 3)
 		if err != nil {
 			log.Printf("❌ GetBookPreview failed book=%s err=%v", bookID, err)
 			return nil, err
 		}
 
-		log.Printf("👀 Preview book loaded pages=%d", len(pages))
+		log.Printf("👀 Preview book loaded pages=%d", len(variants))
 
 	} else {
 		log.Printf("⛔ Access denied user=%s book=%s", userID, bookID)
 		return nil, fmt.Errorf("access denied")
 	}
 
-	maxPage := len(pages)
+	maxPage := 0
+for _, v := range variants {
+	maxPage += len(v.Pages)
+}
 
 	// =========================
 	// SESSION (GET OR CREATE)
@@ -198,9 +202,9 @@ func (e *Engine) Open(
 	return &readermodel.ReadingState{
 		SessionID: session.ID,
 
-		Book: gin.H{
-			"info":  book,
-			"pages": pages,
+		Book: readermodel.BookResponse{
+			Info:  book,
+			Variants: variants,
 		},
 
 		Reader: readermodel.ReaderProgress{

@@ -6,7 +6,7 @@ type ChildResponse struct {
 	ID        string  `json:"id"`
 	Name      string  `json:"name"`
 	AvatarURL *string `json:"avatar_url,omitempty"`
-	Age       *int    `json:"age,omitempty"`
+	Age       int    `json:"age,omitempty"`
 	Language  string  `json:"language"`
     Gamification *GamificationDTO `json:"gamification,omitempty"`
 	CreatedAt time.Time `json:"created_at"`

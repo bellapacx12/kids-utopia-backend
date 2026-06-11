@@ -244,3 +244,334 @@ func (s *BookService) GetBookMeta(
 
 	return s.repo.GetBookByID(ctx, bookID)
 }
+func (s *BookService) CreateUploadedBooks(
+	ctx context.Context,
+	req dto.CreateUploadedBookRequest,
+	fileURL string,
+) (*model.Book, error) {
+
+	log.Println("🔥 CreateUploadedBook called:", req.Title)
+
+	// defaults
+	if req.Language == "" {
+		req.Language = "en"
+	}
+
+	if req.AccessType == "" {
+		req.AccessType = "free"
+	}
+
+	book := &model.Book{
+		ID:          uuid.NewString(),
+		Title:       req.Title,
+		Description: req.Description,
+		Author:      req.Author,
+
+		CoverURL: fileURL,
+
+		AccessType: req.AccessType,
+
+		AgeMin:   req.AgeMin,
+		AgeMax:   req.AgeMax,
+		Language: req.Language,
+		Category: req.Category,
+
+		Status:          "processing",
+		PopularityScore: 0,
+
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+
+	// Save book
+	if err := s.repo.Create(ctx, book); err != nil {
+		return nil, err
+	}
+
+	// Publish processing event
+	event := events.BookUploadedEvent{
+		Type:      "book.uploaded",
+		BookID:    book.ID,
+		ObjectKey: book.CoverURL,
+		Status:    book.Status,
+	}
+
+	data, err := json.Marshal(event)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.queue.Send(string(data)); err != nil {
+		return nil, err
+	}
+
+	return book, nil
+}
+func (s *BookService) CreateBookWithFirstVariant(
+	ctx context.Context,
+	req dto.CreateFirstVariantRequest,
+	fileURL string,
+) (*dto.CreateBookResponse, error) {
+
+	// =========================
+	// 1. CREATE BOOK (IF NEEDED)
+	// =========================
+	bookID := req.BookID
+
+	var book *model.Book
+
+	if bookID == "" {
+		book = &model.Book{
+			ID:          uuid.NewString(),
+			Title:       req.Title,
+			Description: req.Description,
+			Author:      req.Author,
+
+			AccessType: req.AccessType,
+			AgeMin:     req.AgeMin,
+			AgeMax:     req.AgeMax,
+			Category:   req.Category,
+
+			CreatedAt: time.Now(),
+			UpdatedAt: time.Now(),
+		}
+
+		if err := s.repo.Create(ctx, book); err != nil {
+			return nil, err
+		}
+	} else {
+		b, err := s.repo.FindByID(ctx, bookID)
+		if err != nil {
+			return nil, err
+		}
+		book = b
+	}
+
+	// =========================
+	// 2. CREATE FIRST VARIANT
+	// =========================
+	variant := &model.BookVariant{
+		ID:        uuid.NewString(),
+		BookID:    book.ID,
+		Language:  req.Language,
+		Title:     req.Title,
+		FileURL:   fileURL,
+
+		Status:   "processing",
+		Progress: 0,
+
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+
+	if err := s.repo.CreateVariant(ctx, variant); err != nil {
+		return nil, err
+	}
+
+	// =========================
+	// 3. TRIGGER WORKER
+	// =========================
+	event := events.BookVariantUploaded{
+		Type: "book.uploaded",
+		BookID:    book.ID,
+		VariantID: variant.ID,
+		ObjectKey:   fileURL,
+		Language:  req.Language,
+	}
+
+	data, _ := json.Marshal(event)
+	s.queue.Send(string(data))
+
+	// =========================
+	// RETURN BOTH
+	// =========================
+	return &dto.CreateBookResponse{
+		Book:    book,
+		Variant: variant,
+	}, nil
+}
+func (s *BookService) CreateBookVariant(
+	ctx context.Context,
+	req dto.CreateVariantRequest,
+) (*model.BookVariant, error) {
+
+	// =========================
+	// 1. VALIDATE BOOK EXISTS
+	// =========================
+	book, err := s.repo.FindByID(ctx, req.BookID)
+	if err != nil {
+		return nil, fmt.Errorf("book not found: %w", err)
+	}
+
+	// =========================
+	// 2. CREATE VARIANT
+	// =========================
+	variant := &model.BookVariant{
+		ID:       uuid.NewString(),
+		BookID:   book.ID,
+
+		Language: req.Language,
+		Title:    req.Title,
+
+		FileURL: req.FileURL,
+
+		Status:   "processing",
+		Progress: 0,
+
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+
+	if err := s.repo.CreateVariant(ctx, variant); err != nil {
+		return nil, err
+	}
+
+	// =========================
+	// 3. TRIGGER WORKER
+	// =========================
+	event := events.BookVariantUploaded{
+		Type:      "book.uploaded",
+		BookID:    book.ID,
+		VariantID: variant.ID,
+		ObjectKey: variant.FileURL,
+		Language:  variant.Language,
+	}
+
+	data, err := json.Marshal(event)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.queue.Send(string(data)); err != nil {
+		return nil, err
+	}
+
+	return variant, nil
+}
+func (s *BookService) ListBooksWithVariants(
+	ctx context.Context,
+) ([]dto.BookWithVariants, error) {
+
+	books, err := s.repo.ListBooks(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]dto.BookWithVariants, 0, len(books))
+
+	for _, book := range books {
+
+		variants, err := s.repo.ListVariantsByBookID(ctx, book.ID)
+		if err != nil {
+			return nil, err
+		}
+
+		bookDTO := dto.Book{
+			ID:       book.ID,
+			CoverURL: book.CoverURL,
+			Title: buildVariantTitles(variants),
+		}
+
+		result = append(result, dto.BookWithVariants{
+			Book:     bookDTO,
+			Variants: variants,
+		})
+	}
+
+	return result, nil
+}
+
+	
+func (s *BookService) GetVariantsWithPages(
+	ctx context.Context,
+	bookID string,
+) ([]dto.ReaderVariant, error) {
+
+	variants, err := s.repo.ListVariantsByBookID(ctx, bookID)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]dto.ReaderVariant, 0, len(variants))
+
+	for _, v := range variants {
+
+		pages, err := s.repo.GetPagesByVariantIDD(
+			ctx,
+			v.ID,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		result = append(result, dto.ReaderVariant{
+			ID:       v.ID,
+			Language: v.Language,
+			Pages:    pages, // []model.BookPage
+		})
+	}
+
+	return result, nil
+}
+func (s *BookService) GetVariantsWithPreview(
+	ctx context.Context,
+	bookID string,
+	limit int,
+) ([]dto.ReaderVariant, error) {
+
+	variants, err := s.repo.ListVariantsByBookID(ctx, bookID)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]dto.ReaderVariant, 0, len(variants))
+
+	for _, v := range variants {
+
+		pages, err := s.repo.GetPagesByVariantIDD(ctx, v.ID)
+		if err != nil {
+			return nil, err
+		}
+
+		// 🔐 apply preview per variant
+		if limit > 0 && len(pages) > limit {
+			pages = pages[:limit]
+		}
+
+		result = append(result, dto.ReaderVariant{
+			ID:       v.ID,
+			Language: v.Language,
+			Pages:    pages,
+		})
+	}
+
+	return result, nil
+}
+var langMap = map[string]string{
+	"am": "Amharic",
+	"en": "English",
+	"ti": "Tigrigna",
+	"om": "Oromic",
+}
+func buildVariantTitles(variants []model.BookVariant) []string {
+	titles := make([]string, 0, len(variants))
+
+	for _, v := range variants {
+
+		if v.Title == "" {
+			continue
+		}
+
+		label := v.Title
+
+		if langName, ok := langMap[v.Language]; ok {
+			label = langName + ": " + v.Title
+		} else if v.Language != "" {
+			label = v.Language + ": " + v.Title
+		}
+
+		titles = append(titles, label)
+	}
+
+	return titles
+}

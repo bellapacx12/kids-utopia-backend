@@ -12,20 +12,52 @@ type bookRepository struct{}
 func NewBookRepository() BookRepository {
 	return &bookRepository{}
 }
-func (r *bookRepository) Create(ctx context.Context, b *model.Book) error {
+func (r *bookRepository) Create(
+	ctx context.Context,
+	b *model.Book,
+) error {
 
 	query := `
-	INSERT INTO books (id, title, description, author, cover_url, status, created_at, updated_at)
-	VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+	INSERT INTO books (
+		id,
+		title,
+		description,
+		author,
+		cover_url,
+		status,
+		access_type,
+		age_min,
+		age_max,
+		language,
+		category,
+		popularity_score,
+		created_at,
+		updated_at
+	)
+	VALUES (
+		$1,$2,$3,$4,$5,$6,
+		$7,$8,$9,$10,$11,$12,
+		$13,$14
+	)
 	`
 
-	_, err := database.DB.Exec(ctx, query,
+	_, err := database.DB.Exec(
+		ctx,
+		query,
 		b.ID,
 		b.Title,
 		b.Description,
 		b.Author,
 		b.CoverURL,
 		b.Status,
+
+		b.AccessType,
+		b.AgeMin,
+		b.AgeMax,
+		b.Language,
+		b.Category,
+		b.PopularityScore,
+
 		b.CreatedAt,
 		b.UpdatedAt,
 	)
@@ -35,7 +67,21 @@ func (r *bookRepository) Create(ctx context.Context, b *model.Book) error {
 func (r *bookRepository) FindByID(ctx context.Context, id string) (*model.Book, error) {
 
 	query := `
-	SELECT id, title, description, author, cover_url, status, created_at, updated_at
+	SELECT 
+		id,
+		title,
+		description,
+		author,
+		cover_url,
+		status,
+		progress,
+		access_type,
+		age_min,
+		age_max,
+		language,
+		category,
+		created_at,
+		updated_at
 	FROM books
 	WHERE id = $1
 	`
@@ -51,6 +97,12 @@ func (r *bookRepository) FindByID(ctx context.Context, id string) (*model.Book, 
 		&b.Author,
 		&b.CoverURL,
 		&b.Status,
+		&b.Progress,
+		&b.AccessType,
+		&b.AgeMin,
+		&b.AgeMax,
+		&b.Language,
+		&b.Category,
 		&b.CreatedAt,
 		&b.UpdatedAt,
 	)
