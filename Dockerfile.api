@@ -25,6 +25,8 @@ WORKDIR /app
 RUN apk add --no-cache ca-certificates
 
 COPY --from=builder /app/api .
+COPY --from=builder /app/pkg/cert/ca.pem /app/pkg/cert/ca.pem
+
 
 EXPOSE 8080
 
