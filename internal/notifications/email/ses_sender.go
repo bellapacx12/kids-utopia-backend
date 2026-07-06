@@ -34,7 +34,7 @@ func (s *SESSender) Send(to string,  code string) error {
 log.Println("📧 FROM:", s.from)
 
 	subject := "Your OTP Code"
-	body := "Your OTP is: " + code
+	body := "Your KIDS UTOPIA OTP is: " + code
 
 	_, err := s.client.SendEmail(context.TODO(), &ses.SendEmailInput{
 		Source: aws.String(s.from),
