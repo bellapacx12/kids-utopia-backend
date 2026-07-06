@@ -1,34 +1,45 @@
 package kafka
 
 import (
+	"context"
 	"log"
 
-	"github.com/IBM/sarama"
+	"github.com/twmb/franz-go/pkg/kgo"
 )
 
 type Consumer struct {
-	client sarama.Consumer
+	client *kgo.Client
 }
-func NewConsumer(brokers []string) *Consumer {
 
-	config := sarama.NewConfig()
-	config.Consumer.Return.Errors = true
-
-	client, err := sarama.NewConsumer(brokers, config)
-	if err != nil {
-		log.Fatal("Kafka consumer error:", err)
+func NewConsumer(client *Client) *Consumer {
+	return &Consumer{
+		client: client.client,
 	}
-
-	return &Consumer{client: client}
 }
-func (c *Consumer) Consume(topic string, handler func([]byte)) {
 
-	partitionConsumer, err := c.client.ConsumePartition(topic, 0, sarama.OffsetNewest)
-	if err != nil {
-		log.Fatal(err)
+func (c *Consumer) Poll(ctx context.Context) ([]*kgo.Record, error) {
+	fetches := c.client.PollFetches(ctx)
+
+	if err := fetches.Err(); err != nil {
+		log.Printf("❌ PollFetches error: %v", err)
+		return nil, err
 	}
 
-	for msg := range partitionConsumer.Messages() {
-		handler(msg.Value)
-	}
+	var records []*kgo.Record
+	count := 0
+
+	fetches.EachRecord(func(r *kgo.Record) {
+		count++
+
+
+		records = append(records, r)
+	})
+
+	log.Printf("📦 POLLED RECORDS COUNT: %d", count)
+
+	return records, nil
+}
+
+func (c *Consumer) Commit(ctx context.Context, records ...*kgo.Record) error {
+	return c.client.CommitRecords(ctx, records...)
 }

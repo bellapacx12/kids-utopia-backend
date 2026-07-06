@@ -19,6 +19,7 @@ import (
 	readermodel "github.com/bellapacx/kids-utopia/internal/reader/model"
 	sessionsvc "github.com/bellapacx/kids-utopia/internal/reader_session/service"
 	streakservice "github.com/bellapacx/kids-utopia/internal/streak/service"
+	"github.com/bellapacx/kids-utopia/pkg/kafka"
 	"github.com/bellapacx/kids-utopia/pkg/sqs"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -31,6 +32,7 @@ type Engine struct {
 	progressService *progresssvc.ProgressService
 	streakService   *streakservice.StreakService
 	sqsClient       *sqs.Client
+	producer        *kafka.Producer
 }
 
 func New(
@@ -40,6 +42,7 @@ func New(
 	progress *progresssvc.ProgressService,
 	streakService *streakservice.StreakService,
 	sqsClient *sqs.Client,
+	producer *kafka.Producer,
 ) *Engine {
 
 	return &Engine{
@@ -49,6 +52,7 @@ func New(
 		progressService: progress,
 		streakService:   streakService,
 		sqsClient:       sqsClient,
+		producer: producer,
 	}
 }
 func (e *Engine) Open(
@@ -643,11 +647,19 @@ func (e *Engine) State(
 	}, nil
 }
 func (e *Engine) publish(event events.Event) {
+
 	b, err := json.Marshal(event)
-	log.Printf("📦 SQS PAYLOAD:\n%s", string(b))
 	if err != nil {
+		log.Printf("❌ marshal failed: %v", err)
 		return
 	}
 
-	_ = e.sqsClient.Send(string(b))
+	if err := e.producer.Publish(
+		context.Background(),
+		"kids-utopia.events",
+		event.SessionID,
+		b, // 👈 TEMP FORCE RAW JSON
+	); err != nil {
+		log.Printf("❌ kafka publish failed: %v", err)
+	}
 }

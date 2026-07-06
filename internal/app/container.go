@@ -7,6 +7,7 @@ import (
 	"github.com/bellapacx/kids-utopia/internal/reader/events"
 	"github.com/bellapacx/kids-utopia/pkg/config"
 	"github.com/bellapacx/kids-utopia/pkg/database"
+	"github.com/bellapacx/kids-utopia/pkg/kafka"
 	"github.com/bellapacx/kids-utopia/pkg/logger"
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -22,6 +23,7 @@ type Container struct {
 	DB      *pgxpool.Pool
 	Queue   *sqsClient.Client
 	ReaderEventsBus *events.Bus
+	KafkaProducer   *kafka.Producer
 }
 
 func NewContainer() *Container {
@@ -65,12 +67,28 @@ func NewContainer() *Container {
 		log.Fatal(err)
 	}
 	bus := events.NewBus(queue)
+     
+    kafkaClient, err := kafka.New(kafka.Config{
+	Brokers:  cfg.KafkaBrokers,
+	Username: cfg.KafkaUsername,
+	Password: cfg.KafkaPassword,
+	CAFile:   cfg.KafkaCAFile,
+	Topic:    cfg.KafkaTopic,
+	GroupID:  cfg.KafkaGroupID,
+})
+
+if err != nil {
+	log.Fatal(err)
+}
+
+producer := kafka.NewProducer(kafkaClient)
 
 	return &Container{
 		Config:  cfg,
 		DB:      database.DB,
 		Storage: storageClient,
 		Queue:   queue,
+		KafkaProducer:   producer,
 		ReaderEventsBus: bus,
 	}
 }

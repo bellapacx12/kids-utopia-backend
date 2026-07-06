@@ -14,6 +14,7 @@ import (
 	"github.com/bellapacx/kids-utopia/internal/books/events"
 	"github.com/bellapacx/kids-utopia/internal/books/model"
 	"github.com/bellapacx/kids-utopia/internal/books/repository"
+	"github.com/bellapacx/kids-utopia/pkg/kafka"
 	"github.com/bellapacx/kids-utopia/pkg/sqs"
 	"github.com/bellapacx/kids-utopia/pkg/storage"
 	"github.com/google/uuid"
@@ -22,8 +23,9 @@ import (
 type BookService struct {
 	repo repository.BookRepository
 	storage  storage.Storage
-queue   *sqs.Client
+producer *kafka.Producer
 accessService *service.Service
+topic         string
 }
 
 func NewBookService(
@@ -31,13 +33,16 @@ func NewBookService(
 	storage storage.Storage,
 	queue *sqs.Client,
 	accessService *accessservice.Service,
+	producer *kafka.Producer,
+	topic string,
 ) *BookService {
 
 	return &BookService{
 		repo:     repo,
 		storage:  storage,
-		queue: queue,
+		producer:     producer,
 		accessService: accessService,
+		topic: topic,
 	}
 }
 
@@ -113,21 +118,27 @@ func (s *BookService) CreateUploadedBook(
 	}
 
 	// 2. Build Kafka event
-	event := events.BookUploadedEvent{
-	BookID:   book.ID,
-	ObjectKey: book.CoverURL,
-	Status:    book.Status,
+	
+	// 3. Marshal safely
+event := events.BookUploadedEvent{
+		Type:      "book.uploaded",
+		BookID:    book.ID,
+		ObjectKey: book.CoverURL,
+		Status:    book.Status,
+	}
+	b, err := json.Marshal(event)
+if err != nil {
+	return book, err
 }
 
-	// 3. Marshal safely
-	data, err := json.Marshal(event)
-	if err != nil {
-		return nil, err
-	}
 
 	// 4. Publish to Kafka (IMPORTANT: don't ignore error)
-	err = s.queue.Send(string(data))
-if err != nil {
+if err := s.producer.Publish(
+	ctx,
+	s.topic,   // ✅ Kafka topic
+	book.ID,   // ✅ key (partitioning)
+	b,     // ✅ payload
+); err != nil {
 	return nil, err
 }
 
@@ -295,13 +306,20 @@ func (s *BookService) CreateUploadedBooks(
 		ObjectKey: book.CoverURL,
 		Status:    book.Status,
 	}
+	b, err := json.Marshal(event)
+if err != nil {
+	return book, err
+}
 
-	data, err := json.Marshal(event)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := s.queue.Send(string(data)); err != nil {
+	// =========================
+	// 5. PUBLISH TO KAFKA
+	// =========================
+	if err := s.producer.Publish(
+		ctx,
+		s.topic,   // ✅ REQUIRED
+		book.ID,   // ✅ key
+		b,     // ✅ payload
+	); err != nil {
 		return nil, err
 	}
 
@@ -378,9 +396,19 @@ func (s *BookService) CreateBookWithFirstVariant(
 		ObjectKey:   fileURL,
 		Language:  req.Language,
 	}
+     b, err := json.Marshal(event)
+if err != nil {
+	return nil, err
+}
 
-	data, _ := json.Marshal(event)
-	s.queue.Send(string(data))
+	if err := s.producer.Publish(
+		ctx,
+		s.topic,
+		book.ID, // key = book grouping
+		b,
+	); err != nil {
+		return nil, err
+	}
 
 	// =========================
 	// RETURN BOTH
@@ -436,16 +464,19 @@ func (s *BookService) CreateBookVariant(
 		ObjectKey: variant.FileURL,
 		Language:  variant.Language,
 	}
-
-	data, err := json.Marshal(event)
-	if err != nil {
+   b, err := json.Marshal(event)
+if err != nil {
+	return variant, err
+}
+	
+	if err := s.producer.Publish(
+		ctx,
+		s.topic,
+		book.ID, // key = book grouping
+		b,
+	); err != nil {
 		return nil, err
 	}
-
-	if err := s.queue.Send(string(data)); err != nil {
-		return nil, err
-	}
-
 	return variant, nil
 }
 func (s *BookService) ListBooksWithVariants(

@@ -1,34 +1,44 @@
 package kafka
 
 import (
+	"context"
+	"fmt"
 	"log"
 
-	"github.com/IBM/sarama"
+	"github.com/twmb/franz-go/pkg/kgo"
 )
 
 type Producer struct {
-	client sarama.SyncProducer
+	client *kgo.Client
 }
-func NewProducer(brokers []string) *Producer {
-
-	config := sarama.NewConfig()
-	config.Producer.Return.Successes = true
-	config.Producer.RequiredAcks = sarama.WaitForAll
-
-	client, err := sarama.NewSyncProducer(brokers, config)
-	if err != nil {
-		log.Fatal("Kafka init error:", err)
+func NewProducer(client *Client) *Producer {
+	return &Producer{
+		client: client.client,
 	}
-
-	return &Producer{client: client}
 }
-func (p *Producer) Send(topic string, message []byte) error {
+func (p *Producer) Publish(
+	ctx context.Context,
+	topic string,
+	key string,
+	eventBytes []byte,
+) error {
 
-	msg := &sarama.ProducerMessage{
+	log.Printf("📦 PRODUCER SEND topic=%s key=%s bytes=%d",
+		topic, key, len(eventBytes),
+	)
+
+	record := &kgo.Record{
 		Topic: topic,
-		Value: sarama.ByteEncoder(message),
+		Key:   []byte(key),
+		Value: eventBytes, // ✅ already JSON
 	}
 
-	_, _, err := p.client.SendMessage(msg)
-	return err
+	err := p.client.ProduceSync(ctx, record).FirstErr()
+	if err != nil {
+		return fmt.Errorf("publish failed: %w", err)
+	}
+
+	log.Printf("✅ PRODUCED SUCCESS topic=%s offset=sent", topic)
+
+	return nil
 }

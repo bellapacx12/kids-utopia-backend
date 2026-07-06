@@ -10,20 +10,19 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
-
 	analyticsmodel "github.com/bellapacx/kids-utopia/internal/analytics/model"
 	analyticsrepo "github.com/bellapacx/kids-utopia/internal/analytics/repository"
 	analyticssvc "github.com/bellapacx/kids-utopia/internal/analytics/service"
-	"github.com/bellapacx/kids-utopia/internal/books/events"
+
+	bookevents "github.com/bellapacx/kids-utopia/internal/books/events"
 	"github.com/bellapacx/kids-utopia/internal/books/repository"
-	gamificationrules "github.com/bellapacx/kids-utopia/internal/gamification/rules"
 	"github.com/bellapacx/kids-utopia/internal/worker"
+
+	gamificationrules "github.com/bellapacx/kids-utopia/internal/gamification/rules"
 
 	streakrepo "github.com/bellapacx/kids-utopia/internal/streak/repository"
 	streaksvc "github.com/bellapacx/kids-utopia/internal/streak/service"
 
-	// READER SESSION
 	sessionrepo "github.com/bellapacx/kids-utopia/internal/reader_session/repository"
 
 	gamificationrepo "github.com/bellapacx/kids-utopia/internal/gamification/repository"
@@ -34,20 +33,21 @@ import (
 
 	appEvents "github.com/bellapacx/kids-utopia/internal/events"
 	themes "github.com/bellapacx/kids-utopia/internal/gamification/themes"
+
 	progressrepo "github.com/bellapacx/kids-utopia/internal/progress/repository"
 	progressservice "github.com/bellapacx/kids-utopia/internal/progress/service"
+
 	"github.com/bellapacx/kids-utopia/pkg/config"
 	"github.com/bellapacx/kids-utopia/pkg/database"
-	"github.com/bellapacx/kids-utopia/pkg/sqs"
+	"github.com/bellapacx/kids-utopia/pkg/kafka"
 	"github.com/bellapacx/kids-utopia/pkg/storage"
+
+	"github.com/twmb/franz-go/pkg/kgo"
 )
 
 func main() {
 	cfg := config.Load()
 
-	// =========================
-	// DATABASE
-	// =========================
 	dbURL := fmt.Sprintf(
 		"postgres://%s:%s@%s:%s/%s?sslmode=%s",
 		cfg.DBUser,
@@ -61,14 +61,8 @@ func main() {
 	database.Connect(dbURL)
 	log.Println("✅ PostgreSQL connected")
 
-	// =========================
-	// REPOSITORY
-	// =========================
 	bookPagesRepo := repository.NewBookPagesRepository(database.DB)
 
-	// =========================
-	// STORAGE
-	// =========================
 	st, err := storage.NewS3Storage(
 		cfg.S3Endpoint,
 		cfg.S3AccessKey,
@@ -77,46 +71,61 @@ func main() {
 		cfg.S3PublicURL,
 	)
 	if err != nil {
-		log.Fatal("storage init errorrrr:", err)
+		log.Fatal("storage init error:", err)
 	}
 
 	// =========================
-	// SQS
+	// KAFKA
 	// =========================
-	queue, err := sqs.New(cfg.SQSQueueURL, cfg.AWSRegion)
+	client, err := kafka.New(kafka.Config{
+		Brokers:  cfg.KafkaBrokers,
+		Username: cfg.KafkaUsername,
+		Password: cfg.KafkaPassword,
+		CAFile:   cfg.KafkaCAFile,
+		Topic:    cfg.KafkaTopic,
+		GroupID:  cfg.KafkaGroupID,
+	})
+
 	if err != nil {
-		log.Fatal("sqs init error:", err)
+		log.Fatal(err)
 	}
 
-	log.Println("🚀 Worker running (SQS consumer)")
+	log.Printf("🧠 Kafka connected. Brokers=%v Topic=%s Group=%s",
+		cfg.KafkaBrokers,
+		cfg.KafkaTopic,
+		cfg.KafkaGroupID,
+	)
+
+	consumer := kafka.NewConsumer(client)
+
+	// =========================
+	// SERVICES
+	// =========================
 	sessionRepo := sessionrepo.New(database.DB)
-streakRepo := streakrepo.New(database.DB)
-streakservice := streaksvc.New(streakRepo)
+	streakRepo := streakrepo.New(database.DB)
+	streakService := streaksvc.New(streakRepo)
+
 	analyticsRepo := analyticsrepo.New(database.DB)
-analyticsService := analyticssvc.New(analyticsRepo, streakRepo, sessionRepo)
+	analyticsService := analyticssvc.New(analyticsRepo, streakRepo, sessionRepo)
 
-gamificationRepo := gamificationrepo.New(database.DB)
+	gamificationRepo := gamificationrepo.New(database.DB)
+	milestoneRepo := milestonerepo.New(database.DB)
+	milestoneService := milestones.New(milestoneRepo)
 
-milestoneRepo := milestonerepo.New(database.DB)
+	progressRepo := progressrepo.NewProgressRepository(database.DB)
+	progressService := progressservice.NewProgressService(progressRepo)
 
-milestoneService := milestones.New(milestoneRepo)
+	themesRepo := themes.NewRepository(database.DB)
+	themesService := themes.New(themesRepo)
 
-progressRepo := progressrepo.NewProgressRepository(database.DB)
-progressService := progressservice.NewProgressService(progressRepo)
+	gamificationService := gamificationsvc.New(
+		gamificationRepo,
+		milestoneService,
+		streakService,
+		progressService,
+		themesService,
+	)
 
-themesRepo := themes.NewRepository(database.DB)
-themesService := themes.New(themesRepo)
-
-gamificationService := gamificationsvc.New(
-	gamificationRepo,
-	milestoneService,
-	streakservice,
-	progressService,
-	themesService,
-)
-	// =========================
-	// CONTEXT / SHUTDOWN
-	// =========================
 	ctx, cancel := context.WithCancel(context.Background())
 
 	sig := make(chan os.Signal, 1)
@@ -128,19 +137,25 @@ gamificationService := gamificationsvc.New(
 		cancel()
 	}()
 
-	// =========================
-	// WORKER POOL
-	// =========================
 	const workerCount = 3
-	jobs := make(chan types.Message, 20)
+	jobs := make(chan *kgo.Record, 50)
 
 	for i := 0; i < workerCount; i++ {
-		go workerLoop(ctx,i, jobs, queue, st, bookPagesRepo, analyticsService, gamificationService, streakservice)
+		go workerLoop(
+			ctx,
+			i,
+			jobs,
+			st,
+			bookPagesRepo,
+			analyticsService,
+			gamificationService,
+			streakService,
+			consumer,
+		)
 	}
 
-	// =========================
-	// POLLER LOOP
-	// =========================
+	log.Println("🚀 Worker running (Kafka consumer)")
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -149,15 +164,25 @@ gamificationService := gamificationsvc.New(
 			return
 
 		default:
-			messages, err := queue.Receive()
+			records, err := consumer.Poll(ctx)
 			if err != nil {
-				log.Println("receive error:", err)
+				log.Println("❌ kafka poll error:", err)
 				time.Sleep(2 * time.Second)
 				continue
 			}
 
-			for _, msg := range messages {
-				jobs <- msg
+			for _, r := range records {
+
+				log.Printf("📨 RECEIVED MESSAGE: topic=%s partition=%d offset=%d key=%s",
+					r.Topic,
+					r.Partition,
+					r.Offset,
+					string(r.Key),
+				)
+
+				log.Printf("📦 RAW VALUE: %s", string(r.Value))
+
+				jobs <- r
 			}
 		}
 	}
@@ -166,13 +191,13 @@ gamificationService := gamificationsvc.New(
 func workerLoop(
 	ctx context.Context,
 	id int,
-	jobs <-chan types.Message,
-	queue *sqs.Client,
+	jobs <-chan *kgo.Record,
 	st storage.Storage,
 	repo repository.BookPagesRepository,
 	analyticsService *analyticssvc.Service,
 	gamificationService *gamificationsvc.Service,
 	streakService *streaksvc.StreakService,
+	consumer *kafka.Consumer,
 ) {
 	for msg := range jobs {
 
@@ -183,126 +208,73 @@ func workerLoop(
 				}
 			}()
 
-			// =========================
-			// STEP 1: decode base event (lightweight routing)
-			// =========================
+			log.Printf("⚙️ Worker %d processing offset=%d topic=%s",
+				id, msg.Offset, msg.Topic,
+			)
+
+			body := msg.Value
+
 			var base struct {
 				Type string `json:"type"`
 			}
 
-			if err := json.Unmarshal([]byte(*msg.Body), &base); err != nil {
+			if err := json.Unmarshal(body, &base); err != nil {
 				log.Println("❌ invalid base event:", err)
 				return
 			}
 
-			log.Printf("📩 worker %d received event type: %s", id, base.Type)
+			log.Printf("📩 worker %d event type=%s payload=%s", id, base.Type, string(body))
 
-			// =========================
-			// STEP 2: route by type
-			// =========================
 			switch base.Type {
 
-			// =========================
-			// BOOK UPLOADED (existing logic untouched)
-			// =========================
 			case "book.uploaded":
 
-				var event events.BookVariantUploaded
-
-				if err := json.Unmarshal([]byte(*msg.Body), &event); err != nil {
-					log.Println("❌ book event decode failed:", err)
+				var event bookevents.BookVariantUploaded
+				if err := json.Unmarshal(body, &event); err != nil {
+					log.Println("❌ decode failed:", err)
 					return
 				}
-
-				log.Printf("📘 worker %d processing book: %s", id, event.BookID)
 
 				if err := worker.ProcessBook(event, st, repo); err != nil {
-					log.Printf("❌ worker %d failed book %s: %v", id, event.BookID, err)
-					log.Println("Message ID:", *msg.MessageId)
-					_ = queue.Delete(*msg.ReceiptHandle) // DELETE EVEN ON ERROR
+					log.Println("❌ worker failed:", err)
 					return
 				}
 
-				log.Printf("✅ worker %d completed book: %s", id, event.BookID)
-
-			// =========================
-			// PROGRESS EVENT (placeholder)
-			// =========================
 			case "progress.updated":
-                log.Println("update event")
-				if err := analyticsService.ProcessMessage(ctx, *msg.Body); err != nil {
-		log.Printf("❌ analytics insert failed (progress.updated): %v", err)
-		return
-	}
-	          
-	          var event appEvents.Event
+				_ = analyticsService.ProcessMessage(ctx, string(body))
 
-	if err := json.Unmarshal([]byte(*msg.Body), &event); err != nil {
-		log.Printf("❌ progress decode failed: %v", err)
-		return
-	}
+				var event appEvents.Event
+				_ = json.Unmarshal(body, &event)
 
-err := gamificationService.ProcessEvent(
-	ctx,
-	gamificationrules.Event{
-		Type:      string(event.Type),
-		ChildID:   event.ChildID,
-		SessionID: event.SessionID,
-		BookID:    event.BookID,
-		Page:      event.Page,
-		PreviousPage: event.PreviousPage,
-		EventID:   event.EventID,
-		TotalPages : event.TotalPages,
-	},
-)
+				_ = gamificationService.ProcessEvent(ctx, gamificationrules.Event{
+					Type:         string(event.Type),
+					ChildID:      event.ChildID,
+					SessionID:    event.SessionID,
+					BookID:       event.BookID,
+					Page:         event.Page,
+					PreviousPage: event.PreviousPage,
+					EventID:      event.EventID,
+					TotalPages:   event.TotalPages,
+				})
 
-if err != nil {
-	log.Printf("❌ gamification failed: %v", err)
-	return
-}
-
-	log.Printf(
-		"🎮 XP awarded child=%s xp=1 event=%s",
-		event.ChildID,
-		event.EventID,
-	)
-
-			// =========================
-			// SESSION EVENTS (placeholder)
-			// =========================
 			case "session.started":
-				
-	               if err := analyticsService.ProcessMessage(ctx, *msg.Body); err != nil {
-		log.Printf("❌ analytics insert failed: %v", err)
-	}
+				_ = analyticsService.ProcessMessage(ctx, string(body))
 
 			case "session.ended":
-			if err := analyticsService.ProcessMessage(ctx, *msg.Body); err != nil {
-		log.Printf("❌ analytics insert failed: %v", err)
-	}       
-	 var event analyticsmodel.Event
+				_ = analyticsService.ProcessMessage(ctx, string(body))
 
-	if err := json.Unmarshal([]byte(*msg.Body), &event); err != nil {
-		return
-	}
-	       if err := streakService.UpdateStreak(ctx, event.ChildID); err != nil {
-			 log.Printf("streak insert failed; %v", err)
-		   }
-			// =========================
-			// UNKNOWN
-			// =========================
+				var event analyticsmodel.Event
+				_ = json.Unmarshal(body, &event)
+
+				_ = streakService.UpdateStreak(ctx, event.ChildID)
+
 			default:
-				log.Printf("⚠️ unknown event type: %s", base.Type)
+				log.Printf("⚠️ unknown event type=%s raw=%s", base.Type, string(body))
 			}
 
-			// =========================
-			// DELETE MESSAGE ONLY AFTER SUCCESS ROUTE
-			// =========================
-			if err := queue.Delete(*msg.ReceiptHandle); err != nil {
-				log.Println("❌ delete error:", err)
-				return
+			if err := consumer.Commit(ctx, msg); err != nil {
+				log.Println("❌ kafka commit error:", err)
 			}
-
 		}()
 	}
 }

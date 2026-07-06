@@ -2,6 +2,9 @@ package config
 
 import (
 	"os"
+	"strings"
+
+	"github.com/joho/godotenv"
 )
 
 type Config struct {
@@ -35,9 +38,17 @@ type Config struct {
 	SQSQueueURL string
 	SendGridAPIKey string
 	FromEmail string
+	KafkaBrokers []string
+	KafkaTopic   string
+	KafkaGroupID string
+	KafkaUsername string
+	KafkaPassword string
+	KafkaCAFile  string
+	
 }
 
 func Load() *Config {
+		_ = godotenv.Load()
 	return &Config{
 		AppPort: os.Getenv("APP_PORT"),
 
@@ -68,6 +79,12 @@ func Load() *Config {
 		SQSQueueURL:  os.Getenv("SQS_QUEUE_URL"),
 		SendGridAPIKey : os.Getenv("SendGridAPIKey"),
 		FromEmail : os.Getenv("FROM_EMAIL"),
-
+        
+		KafkaBrokers: strings.Split(os.Getenv("KAFKA_BROKERS"), ","),
+KafkaTopic:   os.Getenv("KAFKA_TOPIC"),
+KafkaGroupID: os.Getenv("KAFKA_GROUP_ID"),
+KafkaUsername: os.Getenv("KAFKA_USERNAME"),
+KafkaPassword: os.Getenv("KAFKA_PASSWORD"),
+KafkaCAFile:  os.Getenv("KAFKA_CA_FILE"),
 	}
 }

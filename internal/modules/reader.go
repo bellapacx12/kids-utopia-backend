@@ -70,6 +70,8 @@ func RegisterReader(
 		container.Storage,
 		container.Queue,
 		accessService,
+		container.KafkaProducer,
+		container.Config.KafkaTopic,
 	)
 
 	// =========================
@@ -116,6 +118,7 @@ streakService := streakservice.New(streakRepo)
 		progressService,
 		streakService, // ✅ FIX 1
 	    container.Queue,      // ✅ FIX 2
+		container.KafkaProducer,
 	)
 
 	// =========================

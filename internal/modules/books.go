@@ -59,6 +59,8 @@ func RegisterBooks(
 		container.Storage,
 		container.Queue,
 		accessSvc,
+		container.KafkaProducer,
+		container.Config.KafkaTopic,
 	)
 
 	bookHandler := bookhandler.NewBookHandler(
