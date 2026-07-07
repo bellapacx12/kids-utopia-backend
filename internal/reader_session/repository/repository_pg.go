@@ -172,18 +172,18 @@ func (r *repo) EndSession(
 		SET end_page = $1,
 		    ended_at = $2,
 		    updated_at = $3,
-			completed = $4,
+		    completed = $4
 		WHERE id = $5
 	`
 
 	_, err := r.db.Exec(
 		ctx,
 		query,
-		s.EndPage, // $1
-		now,       // $2 ended_at
+		s.EndPage,
 		now,
-		s.Completed,       // $3 updated_at
-		s.ID,      // $4
+		now,
+		s.Completed,
+		s.ID,
 	)
 
 	return err

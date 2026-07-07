@@ -481,7 +481,7 @@ func (e *Engine) Close(
 	)
 
 	if err != nil {
-		return err
+		return fmt.Errorf("UpdateProgress: %w", err)
 	}
     log.Println("close")
 	e.publish(events.Event{
