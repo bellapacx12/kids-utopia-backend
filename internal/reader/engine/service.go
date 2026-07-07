@@ -312,29 +312,10 @@ if session.EndPage != nil {
 } else {
     prevPage = 0
 }
-var totalPages int
-
-	if allowed {
-
-		_, pages, err := e.bookService.GetBook(
-			ctx,
-			bookID,
-		)
-
-		if err != nil {
-			return err
-		}
-
-		totalPages = len(pages)
-
-	} else {
-
-		totalPages = constants.DefaultPreviewPages
-	}
-
-	if totalPages <= 0 {
-		totalPages = 1
-	}
+totalPages, err := e.getTotalPages(ctx, bookID, allowed, preview)
+if err != nil {
+    return err
+}
 e.publish(events.Event{
 	EventID:   uuid.NewString(),
 	Type:      events.ProgressUpdated,
@@ -350,7 +331,13 @@ e.publish(events.Event{
 	// =========================
 	// TOTAL PAGES
 	// =========================
-
+     log.Printf(
+    "UPDATE user=%s child=%s book=%s page=%d",
+    userID,
+    childID,
+    bookID,
+    page,
+)
 	
 
 	// =========================
@@ -404,51 +391,18 @@ func (e *Engine) Close(
 	// LOAD TOTAL PAGES
 	// =========================
 
-	totalPages := constants.DefaultPreviewPages
-
-	if allowed {
-
-		_, pages, err := e.bookService.GetBook(
-			ctx,
-			bookID,
-		)
-
-		if err != nil {
-			return err
-		}
-
-		totalPages = len(pages)
-
-	} else if preview {
-
-		_, pages, err := e.bookService.GetBookPreview(
-			ctx,
-			bookID,
-		)
-
-		if err != nil {
-			return err
-		}
-
-		totalPages = len(pages)
-
-	} else {
-
-		return fmt.Errorf("access denied")
-	}
-
-	if totalPages <= 0 {
-		totalPages = 1
-	}
+	
+totalPages, err := e.getTotalPages(ctx, bookID, allowed, preview)
+if err != nil {
+    return err
+}
+	
 
 	// =========================
 	// PREVIEW LIMIT PROTECTION
 	// =========================
 
-	if preview && page >= totalPages {
-		page = totalPages - 1
-	}
-
+	
 	// =========================
 	// ACTIVE SESSION
 	// =========================
@@ -662,4 +616,40 @@ func (e *Engine) publish(event events.Event) {
 	); err != nil {
 		log.Printf("❌ kafka publish failed: %v", err)
 	}
+}
+func (e *Engine) getTotalPages(
+	ctx context.Context,
+	bookID string,
+	allowed bool,
+	preview bool,
+) (int, error) {
+
+	var variants []bookdto.ReaderVariant
+	var err error
+
+	if allowed {
+		variants, err = e.bookService.GetVariantsWithPages(ctx, bookID)
+	} else if preview {
+		variants, err = e.bookService.GetVariantsWithPreview(ctx, bookID, 3)
+	} else {
+		return 0, fmt.Errorf("access denied")
+	}
+
+	if err != nil {
+		return 0, err
+	}
+
+	maxPages := 0
+
+	for _, v := range variants {
+		if len(v.Pages) > maxPages {
+			maxPages = len(v.Pages)
+		}
+	}
+
+	if maxPages == 0 {
+		maxPages = 1
+	}
+
+	return maxPages, nil
 }
