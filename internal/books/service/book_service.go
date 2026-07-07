@@ -537,6 +537,7 @@ func (s *BookService) GetVariantsWithPages(
 
 		result = append(result, dto.ReaderVariant{
 			ID:       v.ID,
+			Title: v.Title,
 			Language: v.Language,
 			Pages:    pages, // []model.BookPage
 		})
