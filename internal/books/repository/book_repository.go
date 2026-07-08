@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"database/sql"
 
 	"github.com/bellapacx/kids-utopia/internal/books/dto"
 	"github.com/bellapacx/kids-utopia/internal/books/model"
@@ -285,15 +286,16 @@ func (r *bookRepository) GetPagesByVariantID(
 	return pages, nil
 }
 func (r *bookRepository) GetPagesByVariantIDD(
-    ctx context.Context,
-    variantID string,
+	ctx context.Context,
+	variantID string,
 ) ([]model.BookPage, error) {
 
 	rows, err := database.DB.Query(ctx, `
 		SELECT
 			page_number,
 			content,
-			image_url
+			image_url,
+			audio_url
 		FROM book_pages
 		WHERE variant_id = $1
 		ORDER BY page_number
@@ -308,17 +310,27 @@ func (r *bookRepository) GetPagesByVariantIDD(
 
 	for rows.Next() {
 		var p model.BookPage
+		var audioURL sql.NullString
 
 		err := rows.Scan(
 			&p.PageNumber,
 			&p.Content,
 			&p.ImageURL,
+			&audioURL,
 		)
 		if err != nil {
 			return nil, err
 		}
 
+		if audioURL.Valid {
+			p.AudioURL = &audioURL.String
+		}
+
 		pages = append(pages, p)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 
 	return pages, nil
